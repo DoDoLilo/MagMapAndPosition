@@ -47,10 +47,11 @@ def down_sampling_by_mean(data, factor):
 
 
 # 对输入的一维数组进行绘制查看波形
-def paint_signal(data_signal, title='signal'):
+def paint_signal(data_signal, title='signal', ylim=60):
     plt.figure(figsize=(15, 5))
     x = range(0, len(data_signal))
     plt.title(label=title, loc='center')
+    plt.ylim(0, ylim)
     plt.plot(x, data_signal, label='line', color='g', linewidth=1.0, linestyle='-')
     plt.show()
     plt.close()
