@@ -84,8 +84,10 @@ def cal_length(x):
 def get_mag_hv_2(ori, mag):
     pitch = math.radians(ori[1])
     roll = math.radians(ori[2])
-    mv = abs(-math.sin(pitch)*mag[0]+math.sin(roll)*math.cos(pitch)*mag[1]+math.cos(roll)*math.cos(pitch)*mag[2])
-    mh = math.sqrt(mag[0] * mag[0] + mag[1] * mag[1] + mag[2] * mag[2] - mv * mv)
+    mv = abs(
+        -math.sin(pitch) * mag[0] + math.sin(roll) * math.cos(pitch) * mag[1] + math.cos(roll) * math.cos(pitch) * mag[
+            2])
+    mh = math.sqrt(mag[0] ** 2 + mag[1] ** 2 + mag[2] ** 2 - mv ** 2)
     return mv, mh
 
 
@@ -99,3 +101,75 @@ def get_mag_hv_arr(arr_ori, arr_mag):
 # 用论文方法和ori替代方案计算mv,mh
 
 # 注意使用dtw时，数组前后加0
+
+# 内插填补
+# mag_map[i][j][2]:三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
+# radius：填补所用的半径范围（m）
+# block_size: 单个栅格的大小（m）
+def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
+    # 1、通过radius和block_size计算出斜向、非斜向的最远块数(向下取整)
+    slant_most = int(radius / math.sqrt(2 * block_size ** 2))
+    not_slant_most = int(radius / block_size)
+    # 2、对无效的mag_map[i][j],在这个范围内去找8个方向的有效栅格块，保存有效块的candidates[][3]{mv,mh,distance}
+    slant_directions = [[-1, -1], [+1, +1], [-1, +1], [+1, -1]]
+    not_slant_directions = [[-1, 0], [+1, 0], [0, -1], [0, +1]]
+    empty_list = []
+    succeed_list = []
+    failed_list = []
+    for i in range(0, len(mag_map)):
+        for j in range(0, len(mag_map[0])):
+            if mag_map[i][j][0] == -1:
+                empty_list.append([i, j])
+                # candidates保存候选项的 mv, mh, distance
+                candidates = []
+                # 4对方向，按对同步搜索
+                for t in 0, 1:
+                    # 斜向2对
+                    find1 = search_by_direction_distance(mag_map, i, j, slant_directions[2 * t], slant_most)
+                    find2 = search_by_direction_distance(mag_map, i, j, slant_directions[2 * t + 1], slant_most)
+                    if find1[0] != -1 and find2[0] != -1:
+                        candidates.append(find1)
+                        candidates.append(find2)
+                    # 水平向2对
+                    find1 = search_by_direction_distance(mag_map, i, j, not_slant_directions[2 * t], not_slant_most)
+                    find2 = search_by_direction_distance(mag_map, i, j, not_slant_directions[2 * t + 1], not_slant_most)
+                    if find1[0] != -1 and find2[0] != -1:
+                        candidates.append(find1)
+                        candidates.append(find2)
+                # 3、根据distance进行加权求出当前块的mv',mh'，替换原来的mag_map值
+                if len(candidates) == 0:
+                    failed_list.append([i, j])
+                else:
+                    print(candidates)
+                    succeed_list.append([i, j])
+                    mag_map[i][j][0], mag_map[i][j][1] = cal_weighted_average(candidates)
+
+    return [empty_list, succeed_list, failed_list]
+
+
+# 返回找到的：磁强mv,mh，距离distance
+# 未找到则返回-1,-1,-1
+def search_by_direction_distance(mag_map, i, j, direction, most_far):
+    for distance in range(0, most_far):
+        i = i + direction[0]
+        j = j + direction[1]
+        if -1 < i < len(mag_map) and -1 < j < len(mag_map[0]):
+            if mag_map[i][j][0] != -1 and mag_map[i][j][1] != -1:
+                return [mag_map[i][j][0], mag_map[i][j][1], distance + 1]
+        else:
+            break
+    return [-1, -1, 0]
+
+
+# 计算加权平均并返回
+def cal_weighted_average(candidates):
+    weight_all = 0
+    mv_ave = 0
+    mh_ave = 0
+    for c in candidates:
+        weight_all += c[2]
+    for c in candidates:
+        w = c[2] / weight_all
+        mv_ave += w * c[0]
+        mh_ave += w * c[1]
+    return mv_ave, mh_ave
