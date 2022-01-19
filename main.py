@@ -3,7 +3,7 @@ import mag_mapping_tools as MMT
 
 def main():
     path = "data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"
-    data_all = MMT.get_data_from_csv(path, 0, 29)
+    data_all = MMT.get_data_from_csv(path)
     data_mag = data_all[:, 21:24]
     data_g = data_all[:, 24:27]
     data_ori = data_all[:, 18:21]

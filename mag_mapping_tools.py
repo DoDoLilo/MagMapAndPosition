@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
-def get_data_from_csv(path, row_start, row_end):
+def get_data_from_csv(path, row_start=-1, row_end=-1):
+    if row_start == row_end == -1:
+        return np.loadtxt(path, delimiter=",")
     if row_start < 0:
         row_start = 0
     return np.loadtxt(path, delimiter=",", usecols=range(row_start, row_end + 1))
@@ -173,3 +175,14 @@ def cal_weighted_average(candidates):
         mv_ave += w * c[0]
         mh_ave += w * c[1]
     return mv_ave, mh_ave
+
+
+# -------------------------------------------------------------
+# 挑出ilocator图片质量好的csv文件进行建库
+def build_map_by_one_file():
+    return
+
+
+# 多个文件平均建库
+def build_map_by_multi_files():
+    return
