@@ -39,7 +39,7 @@ def lowpass_emd(data_magnitude, cut_off):
     return data_filtered
 
 
-# 对地磁强度进行指定factor的指定次数的下采样，输入：一维磁强数组，factor，下采样次数，返回：处理后的一维磁强数组
+# 对地磁强度进行一次指定factor的下采样，输入：一维磁强数组，factor，返回：处理后的一维磁强数组
 def down_sampling_by_mean(data, factor):
     data_down = []
     # 舍弃最末尾无法凑成一个Factor的数据
@@ -102,10 +102,12 @@ def get_mag_hv_arr(arr_ori, arr_mag):
 
 # 用论文方法和ori替代方案计算mv,mh
 
+
 # 注意使用dtw时，数组前后加0
 
+
 # 内插填补
-# mag_map[i][j][2]:三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
+# mag_map[i][j][2]:栅格化、坐标正数化，后的三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
 # radius：填补所用的半径范围（m）
 # block_size: 单个栅格的大小（m）
 def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
@@ -177,8 +179,70 @@ def cal_weighted_average(candidates):
     return mv_ave, mh_ave
 
 
-# -------------------------------------------------------------
-# 挑出ilocator图片质量好的csv文件进行建库
+# ---------------------2022/2/14----------------------------------------
+# 绘制二维坐标图
+def paint_xy(arr_x_y):
+    plt.scatter(arr_x_y[:, 0], arr_x_y[:, 1])
+    plt.show()
+    return
+
+
+# 数组arr_mv_mh栅格化 block_size=0.3(m)
+# 输入：arr_mv_mh[N][2] ， x_y_GT轨迹[N][2]，地图范围，块大小
+# 输出：rast_mv_mh[x][y][mv][mh]
+# 思路：①将机房固定分块；②落于同一块中的x_y_GT的对应mv_mh进行平均
+# 实现：arr_1保存平均结果， arr_2保存落入当前块的点个数 n
+def build_rast_mv_mh(arr_mv_mh, arr_xy_gt, map_size_x, map_size_y, block_size):
+    # 先根据地图、块大小，计算块的个数，得到数组的长度。向上取整？
+    shape = [math.ceil(map_size_x / block_size), math.ceil(map_size_y / block_size), 2]
+    rast_mv_mh = np.empty(shape, dtype=float)
+    # 不用考虑平均前求sum时候的溢出情况? sys.float_info.max（1.7976931348623157e + 308）
+    # 创建的rast_mv_mh全置 -1
+    for i in range(0, shape[0]):
+        for j in (0, shape[1]):
+            rast_mv_mh[i][j][0] = -1
+            rast_mv_mh[i][j][1] = -1
+
+    # 创建用来记录个数的数字，blocks_num
+    blocks_num = np.zeros([shape[0], shape[1]], dtype=int)
+    # 遍历arr_mv_mh\arr_xy_gt计算块总和
+    for i in range(0, len(arr_xy_gt)):
+        if arr_mv_mh[i][0] == -1 or arr_mv_mh[i][1] == -1:
+            continue
+        else:
+            block_x = arr_xy_gt[i][0] // block_size
+            block_y = arr_xy_gt[i][1] // block_size
+            rast_mv_mh[block_x][block_y][0] += arr_mv_mh[i][0]
+            rast_mv_mh[block_x][block_y][1] += arr_mv_mh[i][1]
+            blocks_num[block_x][block_y] += 1
+    # 平均
+    for i in range(0, shape[0]):
+        for j in range(0, shape[1]):
+            if blocks_num[i][j] != 0:
+                rast_mv_mh[i][j] /= blocks_num[i][j]
+                # rast_mv_mh[i][j][0] /= blocks_num[i][j]
+                # rast_mv_mh[i][j][1] /= blocks_num[i][j]
+
+    return rast_mv_mh
+
+
+# 数组mag_map坐标-坐标正数化：GT坐标 --> 全正数坐标
+# 思路：每幅图的xy是固定一样的1P2，所以将坐标原点移动至左下角即可
+# 实现：x,y直接加上一个固定整数，GT坐标边界{x轴-7m ~ 1m，y轴-8m ~ 5m} +7,+8 -->
+#                             全正数坐标{x轴 0m ~ 8m，y轴 0m ~ 13m}
+# 数组mag_map坐标-坐标反正数化：全正数坐标 --> GT坐标
+# 思路：正数化的逆操作即可
+def change_axis(arr_x_y_gt, move_x, move_y):
+    for i in range(0, len(arr_x_y_gt)):
+        arr_x_y_gt[i][0] += move_x
+        arr_x_y_gt[i][1] += move_y
+    return
+
+
+# 手动挑出ilocator图片质量好的csv文件进行
+# 函数建库：
+# 输入：栅格化后的 mag_map[i][j][2]:三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
+# 输出：
 def build_map_by_one_file():
     return
 
