@@ -4,6 +4,7 @@ from scipy import signal
 from PyEMD import EMD
 from dtaidistance import dtw
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
@@ -144,7 +145,7 @@ def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
                 if len(candidates) == 0:
                     failed_list.append([i, j])
                 else:
-                    print(candidates)
+                    # print(candidates)
                     succeed_list.append([i, j])
                     mag_map[i][j][0], mag_map[i][j][1] = cal_weighted_average(candidates)
 
@@ -199,7 +200,7 @@ def build_rast_mv_mh(arr_mv_mh, arr_xy_gt, map_size_x, map_size_y, block_size):
     # 不用考虑平均前求sum时候的溢出情况? sys.float_info.max（1.7976931348623157e + 308）
     # 创建的rast_mv_mh全置 -1
     for i in range(0, shape[0]):
-        for j in (0, shape[1]):
+        for j in range(0, shape[1]):
             rast_mv_mh[i][j][0] = -1
             rast_mv_mh[i][j][1] = -1
 
@@ -210,8 +211,8 @@ def build_rast_mv_mh(arr_mv_mh, arr_xy_gt, map_size_x, map_size_y, block_size):
         if arr_mv_mh[i][0] == -1 or arr_mv_mh[i][1] == -1:
             continue
         else:
-            block_x = arr_xy_gt[i][0] // block_size
-            block_y = arr_xy_gt[i][1] // block_size
+            block_x = int(arr_xy_gt[i][0] // block_size)
+            block_y = int(arr_xy_gt[i][1] // block_size)
             rast_mv_mh[block_x][block_y][0] += arr_mv_mh[i][0]
             rast_mv_mh[block_x][block_y][1] += arr_mv_mh[i][1]
             blocks_num[block_x][block_y] += 1
@@ -239,14 +240,25 @@ def change_axis(arr_x_y_gt, move_x, move_y):
     return
 
 
-# 手动挑出ilocator图片质量好的csv文件进行
-# 函数建库：
-# 输入：栅格化后的 mag_map[i][j][2]:三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
-# 输出：
-def build_map_by_one_file():
+# 手动挑出ilocator图片质量好的csv文件进行建库
+# 输入：原始csv文件路径paths
+# 输出：栅格化的地磁双分量数组
+# 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
+# NOTE:是否会数组太长溢出？
+def build_map_by_files():
     return
 
 
-# 多个文件平均建库
-def build_map_by_multi_files():
+# 根据块绘制栅格地磁强度图（热力图）
+# cmap:YlOrRd
+def paint_heat_map(arr_mv_mh):
+    plt.figure(figsize=(19, 10))
+    sns.set(font_scale=0.8)
+    sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
+    plt.show()
+    return
+
+
+# 循环调用内插填补，直到不存在新增块
+def inter_fill_completely():
     return

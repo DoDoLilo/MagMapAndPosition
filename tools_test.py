@@ -28,17 +28,19 @@ data_ori = data_all[:, 18:21]
 data_x_y = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
 
 # 地磁总强度，垂直、水平分量，
-# data_magnitude = MMT.cal_magnitude(data_mag)
-# arr_mv_mh = MMT.get_mag_hv_arr(data_ori, data_mag)
+data_magnitude = MMT.cal_magnitude(data_mag)
+arr_mv_mh = MMT.get_mag_hv_arr(data_ori, data_mag)
 # emd滤波
 # mv_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 0], 4)
 # mh_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 1], 4)
 # magnitude_filtered_emd = MMT.lowpass_emd(data_magnitude, 4)
 # 坐标变换
-# MMT.paint_xy(data_x_y)
-# MMT.change_axis(data_x_y, MOVE_X, MOVE_Y)
-# MMT.paint_xy(data_x_y)
+MMT.change_axis(data_x_y, MOVE_X, MOVE_Y)
+rast_mv_mh = MMT.build_rast_mv_mh(arr_mv_mh, data_x_y, MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE)
+MMT.paint_heat_map(rast_mv_mh)
+MMT.interpolation_to_fill(rast_mv_mh)
+MMT.paint_heat_map(rast_mv_mh)
 
-arr = [1,2,3]
-arr = np.array(arr)
-print(arr/2)
+
+
+
