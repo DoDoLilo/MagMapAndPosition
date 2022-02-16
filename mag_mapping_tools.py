@@ -111,7 +111,10 @@ def get_mag_hv_arr(arr_ori, arr_mag):
 # mag_map[i][j][2]:栅格化、坐标正数化，后的三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
 # radius：填补所用的半径范围（m）
 # block_size: 单个栅格的大小（m）
+# TODO 增加权重，用以删除内插时，产生的多余的、空旷处（距离原始值较远的）的地磁值
 def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
+    # 0、使用copy数组以避免嵌套填补
+    # copy_mag_map = np.copy(mag_map)
     # 1、通过radius和block_size计算出斜向、非斜向的最远块数(向下取整)
     slant_most = int(radius / math.sqrt(2 * block_size ** 2))
     not_slant_most = int(radius / block_size)
@@ -241,12 +244,36 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 
 
 # 手动挑出ilocator图片质量好的csv文件进行建库
-# 输入：原始csv文件路径paths
+# 输入：原始csv文件路径file_paths
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
 # NOTE:是否会数组太长溢出？
-def build_map_by_files():
-    return
+def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, block_size=0.3, radius=1):
+    if len(file_paths) == 0:
+        return None
+    data_all = get_data_from_csv(file_paths[0])
+    data_mag = data_all[:, 21:24]
+    data_ori = data_all[:, 18:21]
+    data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
+
+    for i in range(1, len(file_paths)):
+        data_all = get_data_from_csv(file_paths[i])
+        data_mag = np.vstack((data_mag, data_all[:, 21:24]))
+        data_ori = np.vstack((data_ori, data_all[:, 18:21]))
+        data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
+    # 地磁总强度，垂直、水平分量，
+    data_magnitude = cal_magnitude(data_mag)
+    arr_mv_mh = get_mag_hv_arr(data_ori, data_mag)
+    # emd滤波
+
+    # 栅格化
+    change_axis(data_x_y, move_x, move_y)
+    rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
+    # 内插填补
+    paint_heat_map(rast_mv_mh)
+    interpolation_to_fill(rast_mv_mh, radius, block_size)
+    paint_heat_map(rast_mv_mh)
+    return rast_mv_mh
 
 
 # 根据块绘制栅格地磁强度图（热力图）
@@ -260,5 +287,7 @@ def paint_heat_map(arr_mv_mh):
 
 
 # 循环调用内插填补，直到不存在新增块
-def inter_fill_completely():
+# 输入:栅格化rast_mv_mh，循环次数上限time_threshold(未指定则循环直到不存在新增块)
+# TODO
+def inter_fill_completely(rast_mv_mh, time_threshold=-1):
     return
