@@ -20,6 +20,7 @@ MAP_SIZE_X = 8
 MAP_SIZE_Y = 13
 BLOCK_SIZE = 0.3
 INTER_RADIUS = 1
+INTER_TIME_THR = 2
 
 file_paths = [
     "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
@@ -29,7 +30,13 @@ file_paths = [
     "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
     "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
 ]
-mag_map = MMT.build_map_by_files(file_paths, MOVE_X, MOVE_Y, MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE, INTER_RADIUS)
+mag_map = MMT.build_map_by_files(
+    file_paths=file_paths,
+    move_x=MOVE_X, move_y=MOVE_Y,
+    map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
+    # time_thr=INTER_TIME_THR,
+    radius=INTER_RADIUS, block_size=BLOCK_SIZE
+)
 
 
 

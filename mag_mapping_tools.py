@@ -108,13 +108,14 @@ def get_mag_hv_arr(arr_ori, arr_mag):
 
 
 # 内插填补
-# mag_map[i][j][2]:栅格化、坐标正数化，后的三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
-# radius：填补所用的半径范围（m）
-# block_size: 单个栅格的大小（m）
-# TODO 增加权重，用以删除内插时，产生的多余的、空旷处（距离原始值较远的）的地磁值
+# 输入：mag_map[i][j][2]:栅格化、坐标正数化，后的三维数组，保存栅格i,j的平均磁强mv,mh ，=-1表示无效
+#      radius：填补所用的半径范围（m）
+#      block_size: 单个栅格的大小（m）
+# 输出：空块、填充成功的块、失败的块
 def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
     # 0、使用copy数组以避免嵌套填补
-    # copy_mag_map = np.copy(mag_map)
+    copy_mag_map = np.copy(mag_map)
+    mask_list = []
     # 1、通过radius和block_size计算出斜向、非斜向的最远块数(向下取整)
     slant_most = int(radius / math.sqrt(2 * block_size ** 2))
     not_slant_most = int(radius / block_size)
@@ -133,14 +134,16 @@ def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
                 # 4对方向，按对同步搜索
                 for t in 0, 1:
                     # 斜向2对
-                    find1 = search_by_direction_distance(mag_map, i, j, slant_directions[2 * t], slant_most)
-                    find2 = search_by_direction_distance(mag_map, i, j, slant_directions[2 * t + 1], slant_most)
+                    find1 = search_by_direction_distance(copy_mag_map, i, j, slant_directions[2 * t], slant_most)
+                    find2 = search_by_direction_distance(copy_mag_map, i, j, slant_directions[2 * t + 1], slant_most)
                     if find1[0] != -1 and find2[0] != -1:
                         candidates.append(find1)
                         candidates.append(find2)
                     # 水平向2对
-                    find1 = search_by_direction_distance(mag_map, i, j, not_slant_directions[2 * t], not_slant_most)
-                    find2 = search_by_direction_distance(mag_map, i, j, not_slant_directions[2 * t + 1], not_slant_most)
+                    find1 = search_by_direction_distance(copy_mag_map, i, j, not_slant_directions[2 * t],
+                                                         not_slant_most)
+                    find2 = search_by_direction_distance(copy_mag_map, i, j, not_slant_directions[2 * t + 1],
+                                                         not_slant_most)
                     if find1[0] != -1 and find2[0] != -1:
                         candidates.append(find1)
                         candidates.append(find2)
@@ -148,7 +151,6 @@ def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
                 if len(candidates) == 0:
                     failed_list.append([i, j])
                 else:
-                    # print(candidates)
                     succeed_list.append([i, j])
                     mag_map[i][j][0], mag_map[i][j][1] = cal_weighted_average(candidates)
 
@@ -156,7 +158,7 @@ def interpolation_to_fill(mag_map, radius=1.0, block_size=0.3):
 
 
 # 返回找到的：磁强mv,mh，距离distance
-# 未找到则返回-1,-1,-1
+# 未找到则返回-1,-1,0
 def search_by_direction_distance(mag_map, i, j, direction, most_far):
     for distance in range(0, most_far):
         i = i + direction[0]
@@ -248,7 +250,7 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
 # NOTE:是否会数组太长溢出？
-def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, block_size=0.3, radius=1):
+def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3):
     if len(file_paths) == 0:
         return None
     data_all = get_data_from_csv(file_paths[0])
@@ -271,7 +273,7 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, block
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
     # 内插填补
     paint_heat_map(rast_mv_mh)
-    interpolation_to_fill(rast_mv_mh, radius, block_size)
+    inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
     paint_heat_map(rast_mv_mh)
     return rast_mv_mh
 
@@ -280,13 +282,26 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, block
 # cmap:YlOrRd
 def paint_heat_map(arr_mv_mh):
     plt.figure(figsize=(19, 10))
+    plt.title('mag_vertical')
     sns.set(font_scale=0.8)
     sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
+    plt.show()
+
+    plt.figure(figsize=(19, 10))
+    plt.title('mag_horizontal')
+    sns.set(font_scale=0.8)
+    sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.1f')
     plt.show()
     return
 
 
-# 循环调用内插填补，直到不存在新增块
-# 输入:栅格化rast_mv_mh，循环次数上限time_threshold(未指定则循环直到不存在新增块)
-def inter_fill_completely(rast_mv_mh, time_threshold=-1):
+# 循环调用内插填补
+# 输入:栅格化rast_mv_mh，循环次数上限time_threshold(未指定则循环直到不存在新增块),填补半径radius,块大小block_size
+# TODO 增加自动删除内插时，产生的多余的、空旷处（距离原始值较远的）的地磁值？
+def inter_fill_completely(rast_mv_mh, time_thr=-1, radius=1, block_size=0.3):
+    time = 0
+    while True:
+        time += 1
+        if len(interpolation_to_fill(rast_mv_mh, radius, block_size)[1]) == 0 or time == time_thr:
+            break
     return
