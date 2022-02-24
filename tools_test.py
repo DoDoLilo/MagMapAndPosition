@@ -18,9 +18,10 @@ MOVE_X = 7
 MOVE_Y = 8
 MAP_SIZE_X = 8
 MAP_SIZE_Y = 13
-BLOCK_SIZE = 0.3
+BLOCK_SIZE = 0.25
 INTER_RADIUS = 1
 INTER_TIME_THR = 2
+DELETE_LEVEL = 1
 
 file_paths = [
     "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
@@ -35,7 +36,8 @@ mag_map = MMT.build_map_by_files(
     move_x=MOVE_X, move_y=MOVE_Y,
     map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
     # time_thr=INTER_TIME_THR,
-    radius=INTER_RADIUS, block_size=BLOCK_SIZE
+    radius=INTER_RADIUS, block_size=BLOCK_SIZE,
+    delete_level=DELETE_LEVEL
 )
 
 

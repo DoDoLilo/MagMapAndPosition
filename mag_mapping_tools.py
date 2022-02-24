@@ -250,7 +250,8 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
 # NOTE:是否会数组太长溢出？
-def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3):
+def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
+                       delete_level=0):
     if len(file_paths) == 0:
         return None
     data_all = get_data_from_csv(file_paths[0])
@@ -271,24 +272,27 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
-    # 内插填补
+    # 内插填补，绘制结果
     paint_heat_map(rast_mv_mh)
-    inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    rast_mv_mh_raw = rast_mv_mh.copy()
+    fill_num = inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    paint_heat_map(rast_mv_mh, fill_num)
+    delete_far_blocks(rast_mv_mh_raw, rast_mv_mh, radius, block_size, delete_level)
     paint_heat_map(rast_mv_mh)
     return rast_mv_mh
 
 
 # 根据块绘制栅格地磁强度图（热力图）
 # cmap:YlOrRd
-def paint_heat_map(arr_mv_mh):
+def paint_heat_map(arr_mv_mh, num=0):
     plt.figure(figsize=(19, 10))
-    plt.title('mag_vertical')
+    plt.title('mag_vertical_fill_' + str(num))
     sns.set(font_scale=0.8)
     sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
     plt.show()
 
     plt.figure(figsize=(19, 10))
-    plt.title('mag_horizontal')
+    plt.title('mag_horizontal_fill_' + str(num))
     sns.set(font_scale=0.8)
     sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.1f')
     plt.show()
@@ -297,11 +301,42 @@ def paint_heat_map(arr_mv_mh):
 
 # 循环调用内插填补
 # 输入:栅格化rast_mv_mh，循环次数上限time_threshold(未指定则循环直到不存在新增块),填补半径radius,块大小block_size
-# TODO 增加自动删除内插时，产生的多余的、空旷处（距离原始值较远的）的地磁值？
+# 输出：内插填补的次数 num
 def inter_fill_completely(rast_mv_mh, time_thr=-1, radius=1, block_size=0.3):
-    time = 0
+    num = 0
     while True:
-        time += 1
-        if len(interpolation_to_fill(rast_mv_mh, radius, block_size)[1]) == 0 or time == time_thr:
+        # paint_heat_map(rast_mv_mh, num)
+        num += 1
+        if len(interpolation_to_fill(rast_mv_mh, radius, block_size)[1]) == 0 or num == time_thr:
             break
+    return num
+
+
+# 输入：内插前的栅格化数组rast_raw，内插后数组rast_inter，内插半径，块大小
+# 输出：保留原始位置一个半径内的内插值后的数组
+# 实现：1、copy rast_raw；2、遍历rast_raw，将要保留的位置在copy中置 1；3、修改rast_inter
+def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, delete_level):
+    # 1
+    if len(rast_mv_mh_raw) == 0:
+        return
+    copy_rast_raw = np.copy(rast_mv_mh_raw)
+    far_most = int(radius / math.sqrt(2 * block_size ** 2)) - delete_level
+    if far_most < 1:
+        far_most = 1
+    # 2
+    len_1 = len(rast_mv_mh_raw)
+    len_2 = len(rast_mv_mh_raw[0])
+    for i in range(0, len_1):
+        for j in range(0, len_2):
+            if rast_mv_mh_raw[i][j][0] != -1 or rast_mv_mh_raw[i][j][1] != -1:
+                for b_i in range(i - far_most, i + far_most + 1):
+                    for b_j in range(j - far_most, j + far_most + 1):
+                        if -1 < b_i < len_1 and -1 < b_j < len_2:
+                            copy_rast_raw[b_i][b_j][0] = 1
+    # 3
+    for i in range(0, len_1):
+        for j in range(0, len_2):
+            if copy_rast_raw[i][j][0] == -1:
+                rast_mv_mh_inter[i][j][0] = -1
+                rast_mv_mh_inter[i][j][1] = -1
     return
