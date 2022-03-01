@@ -9,7 +9,7 @@ def main():
     data_ori = data_all[:, 18:21]
     # 地磁总强度，垂直、水平分量，
     data_magnitude = MMT.cal_magnitude(data_mag)
-    arr_mv_mh = MMT.get_mag_hv_arr(data_ori, data_mag)
+    arr_mv_mh = MMT.get_mag_vh_arr(data_ori, data_mag)
     # emd滤波
     mv_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 0], 4)
     mh_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 1], 4)

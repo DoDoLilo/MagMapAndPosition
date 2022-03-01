@@ -84,7 +84,7 @@ def cal_length(x):
 
 
 # 用论文方法和ori计算mv,mh
-def get_mag_hv_2(ori, mag):
+def get_mag_vh_2(ori, mag):
     pitch = math.radians(ori[1])
     roll = math.radians(ori[2])
     mv = abs(
@@ -94,10 +94,10 @@ def get_mag_hv_2(ori, mag):
     return mv, mh
 
 
-def get_mag_hv_arr(arr_ori, arr_mag):
+def get_mag_vh_arr(arr_ori, arr_mag):
     list_mv_mh = []
     for i in range(0, len(arr_ori)):
-        list_mv_mh.append(get_mag_hv_2(arr_ori[i], arr_mag[i]))
+        list_mv_mh.append(get_mag_vh_2(arr_ori[i], arr_mag[i]))
     return np.array(list_mv_mh)
 
 
@@ -266,7 +266,7 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
         data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
     # 地磁总强度，垂直、水平分量，
     data_magnitude = cal_magnitude(data_mag)
-    arr_mv_mh = get_mag_hv_arr(data_ori, data_mag)
+    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # emd滤波
 
     # 栅格化
@@ -284,18 +284,21 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
 
 # 根据块绘制栅格地磁强度图（热力图）
 # cmap:YlOrRd
-def paint_heat_map(arr_mv_mh, num=0):
-    plt.figure(figsize=(19, 10))
-    plt.title('mag_vertical_fill_' + str(num))
-    sns.set(font_scale=0.8)
-    sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
-    plt.show()
+# 输入：[x][y][mv, mh]
+def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
+    if show_mv:
+        plt.figure(figsize=(19, 10))
+        plt.title('mag_vertical_' + str(num))
+        sns.set(font_scale=0.8)
+        sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
+        plt.show()
 
-    plt.figure(figsize=(19, 10))
-    plt.title('mag_horizontal_fill_' + str(num))
-    sns.set(font_scale=0.8)
-    sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.1f')
-    plt.show()
+    if show_mh:
+        plt.figure(figsize=(19, 10))
+        plt.title('mag_horizontal_' + str(num))
+        sns.set(font_scale=0.8)
+        sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.1f')
+        plt.show()
     return
 
 
@@ -340,3 +343,63 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
                 rast_mv_mh_inter[i][j][0] = -1
                 rast_mv_mh_inter[i][j][1] = -1
     return
+
+
+# --------------------------匹配阶段的算法----------------------------------------------------
+# 采样缓冲池_非实时（也使用累积距离）
+# 实现：1、计算mv,mh; 2、计算距离
+# 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
+# TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy。
+#  NOTE:此时data_mag\ori还需与PDR_x_y对齐后再输入， 输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
+# 输出：多条匹配序列[M][x,y, mmv, mmh]
+def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
+    # 计算mv,mh分量,得到[N][mv, mh]
+    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+    # for遍历data_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
+    i_start = 0
+    i_mid = -1
+    dis_sum_temp = 0
+    dis_sum_all = 0
+    dis_mid = down_sip_dis / 2
+    match_seq_list = []
+    match_seq = []
+    for i in range(1, len(data_xy)):
+        dis_sum_temp += math.hypot(data_xy[i][0] - data_xy[i - 1][0], data_xy[i][1] - data_xy[i - 1][1])
+        if dis_sum_temp >= down_sip_dis:
+            match_seq.append(down_sampling(i_start, i_mid, i, data_xy, arr_mv_mh))
+            i_start = i
+            i_mid = -1
+            dis_sum_all += dis_sum_temp
+            dis_sum_temp -= down_sip_dis
+        else:
+            if i_mid == -1 and dis_sum_temp >= dis_mid:
+                i_mid = i
+
+        if dis_sum_all >= buffer_dis:
+            dis_sum_all -= buffer_dis
+            match_seq_list.append(match_seq.copy())
+            match_seq.clear()
+
+    match_seq_list.append(match_seq)
+    return match_seq_list
+
+
+# 对实时采集到的原始磁场序列进行重采样（以空间距离为尺度）
+# NOTE:重采样前是要先进行垂直/水平分量计算的，因为和对应的orientation相关，而ori不能平均
+# 实现：按距离下采样？直线距离/累积距离？
+# --->累积距离：假设为0.3m，则0.15m处x,y的磁强 = 0.0 ~ 0.3m的磁强平均（坐标不能平均）
+# 输入：下采样窗口下标start,mid,end，采集的匹配序列[x, y, mv, mh]
+# 输出：稀疏的 位置-磁场 序列[x, y, mmv, mmh]
+def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
+    mmv = np.mean(arr_mv_mh[i_start:i_end, 0])
+    mmh = np.mean(arr_mv_mh[i_start:i_end, 1])
+    return data_xy[i_mid][0], data_xy[i_mid][1], mmv, mmh
+
+# TODO 对建立的方格指纹库进行双线性插值法
+
+# TODO 高斯牛顿迭代法
+# https://blog.csdn.net/tclxspy/article/details/51281811
+# https://www.cxymm.net/article/qq_41133375/105337383
+
+
+# TODO 实时的采样缓冲池流程
