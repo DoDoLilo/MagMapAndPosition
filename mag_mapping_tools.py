@@ -213,14 +213,11 @@ def build_rast_mv_mh(arr_mv_mh, arr_xy_gt, map_size_x, map_size_y, block_size):
     blocks_num = np.zeros([shape[0], shape[1]], dtype=int)
     # 遍历arr_mv_mh\arr_xy_gt计算块总和
     for i in range(0, len(arr_xy_gt)):
-        if arr_mv_mh[i][0] == -1 or arr_mv_mh[i][1] == -1:
-            continue
-        else:
-            block_x = int(arr_xy_gt[i][0] // block_size)
-            block_y = int(arr_xy_gt[i][1] // block_size)
-            rast_mv_mh[block_x][block_y][0] += arr_mv_mh[i][0]
-            rast_mv_mh[block_x][block_y][1] += arr_mv_mh[i][1]
-            blocks_num[block_x][block_y] += 1
+        block_x = int(arr_xy_gt[i][0] // block_size)
+        block_y = int(arr_xy_gt[i][1] // block_size)
+        rast_mv_mh[block_x][block_y][0] += arr_mv_mh[i][0]
+        rast_mv_mh[block_x][block_y][1] += arr_mv_mh[i][1]
+        blocks_num[block_x][block_y] += 1
     # 平均
     for i in range(0, shape[0]):
         for j in range(0, shape[1]):
@@ -249,7 +246,7 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输入：原始csv文件路径file_paths
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
-# NOTE:是否会数组太长溢出？
+# TODO:滤波
 def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
                        delete_level=0):
     if len(file_paths) == 0:
@@ -290,14 +287,16 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
         plt.figure(figsize=(19, 10))
         plt.title('mag_vertical_' + str(num))
         sns.set(font_scale=0.8)
-        sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.1f')
+        sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.0f')
+        # sns.heatmap(arr_mv_mh[:, :, 0], cmap='rainbow')
         plt.show()
 
     if show_mh:
         plt.figure(figsize=(19, 10))
         plt.title('mag_horizontal_' + str(num))
         sns.set(font_scale=0.8)
-        sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.1f')
+        sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.0f')
+        # sns.heatmap(arr_mv_mh[:, :, 1], cmap='rainbow')
         plt.show()
     return
 
@@ -395,7 +394,40 @@ def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
     mmh = np.mean(arr_mv_mh[i_start:i_end, 1])
     return data_xy[i_mid][0], data_xy[i_mid][1], mmv, mmh
 
+
 # TODO 对建立的方格指纹库进行双线性插值法
+# 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取插值地磁值的坐标 x,y ，block_size:bs
+# 输出：线性插值后的磁强l_mv, l_mh
+# 实现：1、当前点 x,y得到4候选块下标 : [x//bs, x//bs +1] * [y//bs, y//bs +1]
+#      2、候选块下标对应原始坐标到x,y的距离: x-x0=x%bs, x1-x=bs-x%bs, x1-x0=bs; y-y0=y%bs, y1-y=bs-y%bs, y1-y0=bs
+# NOTE: 越界处理：1、若x//bs or y//bs越界，则直接返回-1，-1表示越界错误；2、若+1后越界，则用x//bs替代 x//bs +1
+#    未越界但磁强不存在：1、x//bs or y//bs未越界但磁强不存在：返回-1，-1；2、+1后未越界但不存在，则用x//bs替代 x//bs +1
+def get_linear_map_mvh(mag_map, x, y, block_size):
+    b_x = int(x // block_size)
+    b_y = int(y // block_size)
+    num_b_x = len(mag_map)
+    num_b_y = 0 if num_b_x == 0 else len(mag_map[0])
+    if -1 < b_x < num_b_x and -1 < b_y < num_b_y:
+        m_p00 = mag_map[b_x][b_y]
+        if m_p00[0] == -1:
+            return np.array([-1, -1])
+
+        m_p01 = mag_map[b_x][b_y + 1] if b_y + 1 < num_b_y and mag_map[b_x][b_y + 1][0] != -1 else mag_map[b_x][b_y]
+        m_p10 = mag_map[b_x + 1][b_y] if b_x + 1 < num_b_x and mag_map[b_x + 1][b_y][0] != -1 else mag_map[b_x][b_y]
+        m_p11 = mag_map[b_x + 1][b_y + 1] if b_x + 1 < num_b_x and b_y + 1 < num_b_y and mag_map[b_x + 1][b_y + 1][
+            0] != -1 else mag_map[b_x][b_y]
+
+        x_x0 = x % block_size
+        x1_x = block_size - x_x0
+        x1_x0 = block_size
+        y_y0 = y % block_size
+        y1_y = block_size - y_y0
+        y1_y0 = block_size
+        m_pxy = y_y0 * (x_x0 * m_p11 + x1_x * m_p01) / (x1_x0 * y1_y0) + y1_y * (x_x0 * m_p10 + x1_x * m_p00) / (
+                x1_x0 * y1_y0)
+        return m_pxy
+
+    return np.array([-1, -1])
 
 # TODO 高斯牛顿迭代法
 # https://blog.csdn.net/tclxspy/article/details/51281811

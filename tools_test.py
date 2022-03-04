@@ -26,37 +26,43 @@ DELETE_LEVEL = 1
 BUFFER_DIS = 5
 DOWN_SIP_DIS = BLOCK_SIZE
 
-# file_paths_build_map = [
-#     "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
-#     "data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv",
-#     "data/data_test/data_to_building_map/IMU-10-3-170.97105500171142 Pixel 6_sync.csv",
-#     "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv",
-#     "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
-#     "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
-# ]
-# mag_map = MMT.build_map_by_files(
-#     file_paths=file_paths_build_map,
-#     move_x=MOVE_X, move_y=MOVE_Y,
-#     map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
-#     # time_thr=INTER_TIME_THR,
-#     radius=INTER_RADIUS, block_size=BLOCK_SIZE,
-#     delete_level=DELETE_LEVEL
-# )
+file_paths_build_map = [
+    "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
+    "data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv",
+    "data/data_test/data_to_building_map/IMU-10-3-170.97105500171142 Pixel 6_sync.csv",
+    "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv",
+    "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
+    "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
+]
+mag_map = MMT.build_map_by_files(
+    file_paths=file_paths_build_map,
+    move_x=MOVE_X, move_y=MOVE_Y,
+    map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
+    # time_thr=INTER_TIME_THR,
+    radius=INTER_RADIUS, block_size=BLOCK_SIZE,
+    delete_level=DELETE_LEVEL
+)
 
-# TODO NOTE测试阶段也使用建库的文件进行测试
-file_path_test = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
-data_all = MMT.get_data_from_csv(file_path_test)
-data_mag = data_all[:, 21:24]
-data_ori = data_all[:, 18:21]
-data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
+print(mag_map.shape)
 
-MMT.change_axis(data_x_y, move_x=MOVE_X, move_y=MOVE_Y)
-match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, data_ori, data_mag, data_x_y)
-x_y_list = []
-for seq in match_seq_list:
-    test_arr = np.array(seq)
-    rast_mv_mh = MMT.build_rast_mv_mh(test_arr[:, 2:4], test_arr[:, 0:2], MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE)
-    MMT.paint_heat_map(rast_mv_mh, show_mv=False)
+print(MMT.get_linear_map_mvh(mag_map, 19*BLOCK_SIZE+BLOCK_SIZE/2, 28*BLOCK_SIZE+BLOCK_SIZE/2, BLOCK_SIZE))
+
+
+
+# # TODO NOTE测试阶段也使用建库的文件进行测试
+# file_path_test = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
+# data_all = MMT.get_data_from_csv(file_path_test)
+# data_mag = data_all[:, 21:24]
+# data_ori = data_all[:, 18:21]
+# data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
+#
+# MMT.change_axis(data_x_y, move_x=MOVE_X, move_y=MOVE_Y)
+# match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, data_ori, data_mag, data_x_y)
+# x_y_list = []
+# for seq in match_seq_list:
+#     test_arr = np.array(seq)
+#     rast_mv_mh = MMT.build_rast_mv_mh(test_arr[:, 2:4], test_arr[:, 0:2], MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE)
+#     MMT.paint_heat_map(rast_mv_mh, show_mv=False)
 
 
 # MMT.paint_heat_map(np.array(x_y_list))
