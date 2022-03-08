@@ -395,7 +395,7 @@ def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
     return data_xy[i_mid][0], data_xy[i_mid][1], mmv, mmh
 
 
-# TODO 对建立的方格指纹库进行双线性插值法
+# 对建立的方格指纹库进行双线性插值法+偏微分
 # 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取插值地磁值的坐标 x,y ，block_size:bs
 # 输出：线性插值后的磁强l_mv, l_mh
 # 实现：1、当前点 x,y得到4候选块下标 : [x//bs, x//bs +1] * [y//bs, y//bs +1]
@@ -425,7 +425,9 @@ def get_linear_map_mvh(mag_map, x, y, block_size):
         y1_y0 = block_size
         m_pxy = y_y0 * (x_x0 * m_p11 + x1_x * m_p01) / (x1_x0 * y1_y0) + y1_y * (x_x0 * m_p10 + x1_x * m_p00) / (
                 x1_x0 * y1_y0)
-        return m_pxy
+        grad_px = y_y0 * (m_p11 - m_p01) / (x1_x0 * y1_y0) + y1_y * (m_p10 - m_p00) / (x1_x0 * y1_y0)
+        grad_py = x_x0 * (m_p11 - m_p10) / (x1_x0 * y1_y0) + x1_x * (m_p01 - m_p00) / (x1_x0 * y1_y0)
+        return m_pxy, grad_px, grad_py
 
     return np.array([-1, -1])
 
