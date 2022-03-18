@@ -13,6 +13,7 @@
 #     print(i)
 import mag_mapping_tools as MMT
 import numpy as np
+import math
 
 MOVE_X = 7
 MOVE_Y = 8
@@ -34,20 +35,14 @@ file_paths_build_map = [
     "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
     "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
 ]
-mag_map = MMT.build_map_by_files(
-    file_paths=file_paths_build_map,
-    move_x=MOVE_X, move_y=MOVE_Y,
-    map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
-    # time_thr=INTER_TIME_THR,
-    radius=INTER_RADIUS, block_size=BLOCK_SIZE,
-    delete_level=DELETE_LEVEL
-)
-
-print(mag_map.shape)
-
-print(MMT.get_linear_map_mvh(mag_map, 19*BLOCK_SIZE+BLOCK_SIZE/2, 28*BLOCK_SIZE+BLOCK_SIZE/2, BLOCK_SIZE))
-
-
+# mag_map = MMT.build_map_by_files(
+#     file_paths=file_paths_build_map,
+#     move_x=MOVE_X, move_y=MOVE_Y,
+#     map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
+#     # time_thr=INTER_TIME_THR,
+#     radius=INTER_RADIUS, block_size=BLOCK_SIZE,
+#     delete_level=DELETE_LEVEL
+# )
 
 # # TODO NOTE测试阶段也使用建库的文件进行测试
 # file_path_test = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
@@ -57,9 +52,8 @@ print(MMT.get_linear_map_mvh(mag_map, 19*BLOCK_SIZE+BLOCK_SIZE/2, 28*BLOCK_SIZE+
 # data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
 #
 # MMT.change_axis(data_x_y, move_x=MOVE_X, move_y=MOVE_Y)
-# match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, data_ori, data_mag, data_x_y)
-# x_y_list = []
-# for seq in match_seq_list:
+# match_seq_arr = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, data_ori, data_mag, data_x_y)
+# for seq in match_seq_arr:
 #     test_arr = np.array(seq)
 #     rast_mv_mh = MMT.build_rast_mv_mh(test_arr[:, 2:4], test_arr[:, 0:2], MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE)
 #     MMT.paint_heat_map(rast_mv_mh, show_mv=False)
@@ -87,3 +81,12 @@ print(MMT.get_linear_map_mvh(mag_map, 19*BLOCK_SIZE+BLOCK_SIZE/2, 28*BLOCK_SIZE+
 # MMT.paint_heat_map(rast_mv_mh)
 # MMT.interpolation_to_fill(rast_mv_mh)
 # MMT.paint_heat_map(rast_mv_mh)
+
+# 坐标转换测试
+# transfer=[-1, 1, math.radians(90)]
+# print(MMT.transferXY(transfer, 1, 1))
+
+# 残差平方和测试
+m1 = np.array([[1, 2], [0.5, 4]])
+m2 = np.array([[1, 2], [3, 4]])
+print(MMT.cal_loss(m1, m2))

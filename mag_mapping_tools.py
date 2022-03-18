@@ -101,10 +101,7 @@ def get_mag_vh_arr(arr_ori, arr_mag):
     return np.array(list_mv_mh)
 
 
-# 用论文方法和ori替代方案计算mv,mh
-
-
-# 注意使用dtw时，数组前后加0
+# 用论文方法和ori替代方案计算mv,mh？
 
 
 # 内插填补
@@ -346,11 +343,11 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 
 # --------------------------匹配阶段的算法----------------------------------------------------
 # 采样缓冲池_非实时（也使用累积距离）
-# 实现：1、计算mv,mh; 2、计算距离
+# 实现：1、计算mv,mh; 2、计算PDR累计距离
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
-# TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy。
+# TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐后再输入， 输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
-# 输出：多条匹配序列[M][x,y, mmv, mmh]
+# 输出：多条匹配序列[?][M][x,y, mv, mh]
 def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
@@ -380,7 +377,7 @@ def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
             match_seq.clear()
 
     match_seq_list.append(match_seq)
-    return match_seq_list
+    return np.array(match_seq_list)
 
 
 # 对实时采集到的原始磁场序列进行重采样（以空间距离为尺度）
@@ -396,21 +393,22 @@ def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
 
 
 # 对建立的方格指纹库进行双线性插值法+偏微分
-# 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取插值地磁值的坐标 x,y ，block_size:bs
-# 输出：线性插值后的磁强l_mv, l_mh
+# 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取地磁插值、梯度的坐标 x,y ，block_size:bs
+# 输出：np.array[线性插值后的磁强[l_mv, l_mh], 2对梯度分量[mv/x , mv/y], [mh/x, mh/y]]
 # 实现：1、当前点 x,y得到4候选块下标 : [x//bs, x//bs +1] * [y//bs, y//bs +1]
 #      2、候选块下标对应原始坐标到x,y的距离: x-x0=x%bs, x1-x=bs-x%bs, x1-x0=bs; y-y0=y%bs, y1-y=bs-y%bs, y1-y0=bs
 # NOTE: 越界处理：1、若x//bs or y//bs越界，则直接返回-1，-1表示越界错误；2、若+1后越界，则用x//bs替代 x//bs +1
 #    未越界但磁强不存在：1、x//bs or y//bs未越界但磁强不存在：返回-1，-1；2、+1后未越界但不存在，则用x//bs替代 x//bs +1
-def get_linear_map_mvh(mag_map, x, y, block_size):
+def get_linear_grad_map_mvh(mag_map, x, y, block_size):
     b_x = int(x // block_size)
     b_y = int(y // block_size)
     num_b_x = len(mag_map)
     num_b_y = 0 if num_b_x == 0 else len(mag_map[0])
+
     if -1 < b_x < num_b_x and -1 < b_y < num_b_y:
         m_p00 = mag_map[b_x][b_y]
         if m_p00[0] == -1:
-            return np.array([-1, -1])
+            return np.array([[-1, -1], [-1, -1], [-1, -1]])
 
         m_p01 = mag_map[b_x][b_y + 1] if b_y + 1 < num_b_y and mag_map[b_x][b_y + 1][0] != -1 else mag_map[b_x][b_y]
         m_p10 = mag_map[b_x + 1][b_y] if b_x + 1 < num_b_x and mag_map[b_x + 1][b_y][0] != -1 else mag_map[b_x][b_y]
@@ -427,13 +425,45 @@ def get_linear_map_mvh(mag_map, x, y, block_size):
                 x1_x0 * y1_y0)
         grad_px = y_y0 * (m_p11 - m_p01) / (x1_x0 * y1_y0) + y1_y * (m_p10 - m_p00) / (x1_x0 * y1_y0)
         grad_py = x_x0 * (m_p11 - m_p10) / (x1_x0 * y1_y0) + x1_x * (m_p01 - m_p00) / (x1_x0 * y1_y0)
-        return m_pxy, grad_px, grad_py
 
-    return np.array([-1, -1])
+        return np.array([m_pxy, [grad_px[0], grad_py[0]], [grad_px[1], grad_py[1]]])
+
+    return np.array([[-1, -1], [-1, -1], [-1, -1]])
+
 
 # TODO 高斯牛顿迭代法
-# https://blog.csdn.net/tclxspy/article/details/51281811
-# https://www.cxymm.net/article/qq_41133375/105337383
+#  注意写公式的时候一定要检查清楚变量含义和论文是否没错
 
 
 # TODO 实时的采样缓冲池流程
+
+
+# 坐标变换函数，论文公式4.7。求x1, y1关于transfer的偏导矩阵，论文公式4.13
+# 输入：变换向量transfer=[_x, _y, _angle(弧度，绕PDR坐标系的(0, 0)逆时针)]，被变换坐标PDR(x0,y0)
+# 输出：转换后的坐标 x1, y1，偏导矩阵 grad_xy(2*3)
+# NOTE: t_angle是弧度！不是°。 degrees(x) : 将弧度转化为角度  radians(x) : 将角度转化为弧度。
+def transfer_axis_with_grad(transfer, x0, y0):
+    _x = transfer[0]
+    _y = transfer[1]
+    _angle = transfer[2]
+    m_angle = np.array([[math.cos(_angle), -math.sin(_angle)],
+                        [math.sin(_angle), math.cos(_angle)]])
+    m_move = np.array([[_x],
+                       [_y]])
+    m_xy = np.array([[x0],
+                     [y0]])
+    ans = np.dot(m_angle, m_xy) + m_move
+    grad_xy = np.array([[1, 0, -math.sin(_angle) * x0 - math.cos(_angle) * y0],
+                        [0, 1, math.cos(_angle) * x0 - math.sin(_angle) * y0]])
+    return ans[0][0], ans[1][0], grad_xy
+
+
+# 计算残差平方和，论文公式4.8
+# 输入：重采样的：PDR实时地磁序列M1[M][mv, mh]，Mag_Map地磁序列M2[M][mv, mh]
+# 输出：残差平方和 S
+# 实现：欧氏距离
+def cal_loss(mag_arr_1, mag_arr_2):
+    s = 0
+    for m1, m2 in zip(mag_arr_1, mag_arr_2):
+        s += (m1[0] - m2[0]) ** 2 + (m1[1] - m2[1]) ** 2
+    return s
