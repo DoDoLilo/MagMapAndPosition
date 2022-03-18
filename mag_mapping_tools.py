@@ -394,12 +394,12 @@ def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
 
 # 对建立的方格指纹库进行双线性插值法+偏微分
 # 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取地磁插值、梯度的坐标 x,y ，block_size:bs
-# 输出：np.array[线性插值后的磁强[l_mv, l_mh], 2对梯度分量[mv/x , mv/y], [mh/x, mh/y]]
+# 输出：np.array[线性插值后的磁强[l_mv, l_mh], 2对梯度分量[[[[mv/x , mv/y]], [[mh/x, mh/y]]]] :[2][1×2]
 # 实现：1、当前点 x,y得到4候选块下标 : [x//bs, x//bs +1] * [y//bs, y//bs +1]
 #      2、候选块下标对应原始坐标到x,y的距离: x-x0=x%bs, x1-x=bs-x%bs, x1-x0=bs; y-y0=y%bs, y1-y=bs-y%bs, y1-y0=bs
 # NOTE: 越界处理：1、若x//bs or y//bs越界，则直接返回-1，-1表示越界错误；2、若+1后越界，则用x//bs替代 x//bs +1
 #    未越界但磁强不存在：1、x//bs or y//bs未越界但磁强不存在：返回-1，-1；2、+1后未越界但不存在，则用x//bs替代 x//bs +1
-def get_linear_grad_map_mvh(mag_map, x, y, block_size):
+def get_linear_map_mvh_with_grad(mag_map, x, y, block_size):
     b_x = int(x // block_size)
     b_y = int(y // block_size)
     num_b_x = len(mag_map)
@@ -426,16 +426,9 @@ def get_linear_grad_map_mvh(mag_map, x, y, block_size):
         grad_px = y_y0 * (m_p11 - m_p01) / (x1_x0 * y1_y0) + y1_y * (m_p10 - m_p00) / (x1_x0 * y1_y0)
         grad_py = x_x0 * (m_p11 - m_p10) / (x1_x0 * y1_y0) + x1_x * (m_p01 - m_p00) / (x1_x0 * y1_y0)
 
-        return np.array([m_pxy, [grad_px[0], grad_py[0]], [grad_px[1], grad_py[1]]])
-
-    return np.array([[-1, -1], [-1, -1], [-1, -1]])
-
-
-# TODO 高斯牛顿迭代法
-#  注意写公式的时候一定要检查清楚变量含义和论文是否没错
-
-
-# TODO 实时的采样缓冲池流程
+        return m_pxy, np.array([[[grad_px[0], grad_py[0]]], [[grad_px[1], grad_py[1]]]])
+    # TODO 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+    return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
 
 
 # 坐标变换函数，论文公式4.7。求x1, y1关于transfer的偏导矩阵，论文公式4.13
@@ -467,3 +460,28 @@ def cal_loss(mag_arr_1, mag_arr_2):
     for m1, m2 in zip(mag_arr_1, mag_arr_2):
         s += (m1[0] - m2[0]) ** 2 + (m1[1] - m2[1]) ** 2
     return s
+
+
+# 高斯牛顿迭代法，实现论文公式4.11 4.12
+# TODO 注意写公式的时候一定要检查清楚变量含义和论文是否没错
+# 实现：仅计算两点之间的高斯牛顿迭代_transfer。 矩阵转置 arr.transpose，逆np.linalg.inv(arr)
+# 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]，重采样的PDR地磁mag_p[mv, mh]、指纹库的地磁mag_m[mv, mh]
+# 输出：单点迭代结果向量_transfer[3×1] --> [1×3]
+# NOTE：[1,2,3].shape不是[1×3]而是[0×3]， [[1,2,3]]才是[1×3] ！！！
+def cal_GaussNewton_increment(mag_map_grads, xy_grad, mag_P, mag_M):
+    m0 = np.dot(mag_map_grads[0], xy_grad)
+    m1 = np.dot(mag_map_grads[1], xy_grad)
+
+    try:
+        _transfer = np.dot(np.dot(np.linalg.inv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
+            np.dot(np.dot(np.linalg.inv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
+    except np.linalg.LinAlgError:
+        print("不存在逆矩阵")
+        return np.array([0, 0, 0])
+
+    return _transfer.transpose()[0]
+
+# TODO 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+
+
+# TODO 实时的采样缓冲池流程
