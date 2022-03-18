@@ -474,10 +474,13 @@ def cal_GaussNewton_increment(mag_map_grads, xy_grad, mag_P, mag_M):
 
     try:
         _transfer = np.dot(np.dot(np.linalg.inv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
-            np.dot(np.dot(np.linalg.inv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
+                    np.dot(np.dot(np.linalg.inv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
     except np.linalg.LinAlgError:
-        print("不存在逆矩阵")
-        return np.array([0, 0, 0])
+        _transfer = np.dot(np.dot(np.linalg.pinv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
+                    np.dot(np.dot(np.linalg.pinv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
+        # 如果A为非奇异方阵，pinv(A)=inv(A)，但却会耗费大量的计算时间，相比较而言，inv(A)花费更少的时间。
+        print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
+        # return np.array([0, 0, 0])
 
     return _transfer.transpose()[0]
 
