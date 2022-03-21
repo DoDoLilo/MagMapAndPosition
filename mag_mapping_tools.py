@@ -407,13 +407,13 @@ def get_linear_map_mvh_with_grad(mag_map, x, y, block_size):
 
     if -1 < b_x < num_b_x and -1 < b_y < num_b_y:
         m_p00 = mag_map[b_x][b_y]
-        if m_p00[0] == -1:
-            return np.array([[-1, -1], [-1, -1], [-1, -1]])
+        if m_p00[0] == -1 or m_p00[1] == -1:
+            return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
 
-        m_p01 = mag_map[b_x][b_y + 1] if b_y + 1 < num_b_y and mag_map[b_x][b_y + 1][0] != -1 else mag_map[b_x][b_y]
-        m_p10 = mag_map[b_x + 1][b_y] if b_x + 1 < num_b_x and mag_map[b_x + 1][b_y][0] != -1 else mag_map[b_x][b_y]
+        m_p01 = mag_map[b_x][b_y + 1] if b_y + 1 < num_b_y and mag_map[b_x][b_y + 1][0] != -1 else m_p00
+        m_p10 = mag_map[b_x + 1][b_y] if b_x + 1 < num_b_x and mag_map[b_x + 1][b_y][0] != -1 else m_p00
         m_p11 = mag_map[b_x + 1][b_y + 1] if b_x + 1 < num_b_x and b_y + 1 < num_b_y and mag_map[b_x + 1][b_y + 1][
-            0] != -1 else mag_map[b_x][b_y]
+            0] != -1 else m_p00
 
         x_x0 = x % block_size
         x1_x = block_size - x_x0
@@ -531,6 +531,5 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
 
     # NOTE:如果out_of_map = True，则last_loss无效
     return out_of_map, last_loss, map_xy, new_transfer
-
 
 # TODO 实时的采样缓冲池流程
