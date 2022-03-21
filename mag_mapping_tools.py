@@ -342,7 +342,7 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 
 
 # --------------------------匹配阶段的算法----------------------------------------------------
-# 采样缓冲池_非实时（也使用累积距离）
+# 采样缓冲池_非实时（也使用累积距离）包括稀疏采样处理
 # 实现：1、计算mv,mh; 2、计算PDR累计距离
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
 # TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
@@ -427,7 +427,8 @@ def get_linear_map_mvh_with_grad(mag_map, x, y, block_size):
         grad_py = x_x0 * (m_p11 - m_p10) / (x1_x0 * y1_y0) + x1_x * (m_p01 - m_p00) / (x1_x0 * y1_y0)
 
         return m_pxy, np.array([[[grad_px[0], grad_py[0]]], [[grad_px[1], grad_py[1]]]])
-    # TODO 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+    # 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+    print("Error: Out of Whole Map!")
     return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
 
 
@@ -468,9 +469,9 @@ def cal_loss(mag_arr_1, mag_arr_2):
 # 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]，重采样的PDR地磁mag_p[mv, mh]、指纹库的地磁mag_m[mv, mh]
 # 输出：单点迭代结果向量_transfer[3×1] --> [1×3]
 # NOTE：[1,2,3].shape不是[1×3]而是[0×3]， [[1,2,3]]才是[1×3] ！！！
-def cal_GaussNewton_increment(mag_map_grads, xy_grad, mag_P, mag_M):
-    m0 = np.dot(mag_map_grads[0], xy_grad)
-    m1 = np.dot(mag_map_grads[1], xy_grad)
+def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
+    m0 = np.dot(mag_map_grad[0], xy_grad)
+    m1 = np.dot(mag_map_grad[1], xy_grad)
 
     try:
         _transfer = np.dot(np.dot(np.linalg.inv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
@@ -479,12 +480,57 @@ def cal_GaussNewton_increment(mag_map_grads, xy_grad, mag_P, mag_M):
         _transfer = np.dot(np.dot(np.linalg.pinv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
                     np.dot(np.dot(np.linalg.pinv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
         # 如果A为非奇异方阵，pinv(A)=inv(A)，但却会耗费大量的计算时间，相比较而言，inv(A)花费更少的时间。
-        print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
+        # print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
         # return np.array([0, 0, 0])
 
     return _transfer.transpose()[0]
 
-# TODO 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+
+# 注意全流程的时候进行-1检查！
+# 匹配全流程：
+# 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
+# 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
+def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size):
+    # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
+    pdr_xy = sparse_PDR_mag[:, 0:2]
+    pdr_mvh = sparse_PDR_mag[:, 2:4]
+    map_xy = []
+    xy_grads = []
+    for xy in pdr_xy:
+        x, y, grad = transfer_axis_with_grad(last_transfer, xy[0], xy[1])
+        map_xy.append([x, y])
+        xy_grads.append(grad)
+    map_xy = np.array(map_xy)
+    xy_grads = np.array(xy_grads)
+
+    # 2、由map_xy到mag_map中获取 map_mvh[M][mv, mh], mag_map_grads[M][2][[1×2]]
+    # 若获取到了-1，怎么办？表示到了地图外面，此种迭代方向错误-->提前结束迭代，抛出Exception
+    out_of_map = False
+    map_mvh = []
+    mag_map_grads = []
+    for xy in map_xy:
+        mvh, grad = get_linear_map_mvh_with_grad(mag_map, xy[0], xy[1], block_size)
+        if mvh[0] == -1 or mvh[1] == -1:
+            out_of_map = True
+            break
+        map_mvh.append(mvh)
+        mag_map_grads.append(grad)
+    map_mvh = np.array(map_mvh)
+    mag_map_grads = np.array(mag_map_grads)
+
+    # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
+    last_loss = cal_loss(pdr_mvh, map_mvh)
+
+    # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)计算 _transfer
+    new_transfer = last_transfer
+    for mag_map_grad, xy_grad, mag_P, mag_M in zip(mag_map_grads, xy_grads, pdr_mvh, map_mvh):
+        t = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)
+        new_transfer[0] += t[0]
+        new_transfer[1] += t[1]
+        new_transfer[2] += t[2]
+
+    # NOTE:如果out_of_map = True，则last_loss无效
+    return out_of_map, last_loss, map_xy, new_transfer
 
 
 # TODO 实时的采样缓冲池流程

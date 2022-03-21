@@ -91,9 +91,10 @@ file_paths_build_map = [
 # m2 = np.array([[1, 2], [3, 4]])
 # print(MMT.cal_loss(m1, m2))
 
-arr1 = np.array([[1],
-                 [2],
-                 [3]])
+# arr1 = np.array([[1],
+#                  [2],
+#                  [3]])
+#
+# print(MMT.cal_GaussNewton_increment(np.array([[[1, 1]], [[3, 4]]]), np.array([[5, 6, 7], [8, 9, 10]]),
+#       np.array([2, 2]), np.array([1, 1])))
 
-print(MMT.cal_GaussNewton_increment(np.array([[[1, 1]], [[3, 4]]]), np.array([[5, 6, 7], [8, 9, 10]]),
-      np.array([2, 2]), np.array([1, 1])))
