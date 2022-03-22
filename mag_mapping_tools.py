@@ -245,7 +245,7 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
 # TODO:滤波
 def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
-                       delete_level=0):
+                       delete=False, delete_level=0):
     if len(file_paths) == 0:
         return None
     data_all = get_data_from_csv(file_paths[0])
@@ -261,7 +261,7 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     # 地磁总强度，垂直、水平分量，
     data_magnitude = cal_magnitude(data_mag)
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
-    # emd滤波
+    # TODO emd滤波
 
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
@@ -270,8 +270,9 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     paint_heat_map(rast_mv_mh)
     rast_mv_mh_raw = rast_mv_mh.copy()
     fill_num = inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
-    paint_heat_map(rast_mv_mh, fill_num)
-    delete_far_blocks(rast_mv_mh_raw, rast_mv_mh, radius, block_size, delete_level)
+    # paint_heat_map(rast_mv_mh, fill_num)
+    if delete:
+        delete_far_blocks(rast_mv_mh_raw, rast_mv_mh, radius, block_size, delete_level)
     paint_heat_map(rast_mv_mh)
     return rast_mv_mh
 
@@ -347,7 +348,7 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
 # TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐后再输入， 输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
-# 输出：多条匹配序列[?][M][x,y, mv, mh]
+# 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度不一样
 def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
@@ -377,7 +378,8 @@ def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
             match_seq.clear()
 
     match_seq_list.append(match_seq)
-    return np.array(match_seq_list)
+    # Don't change to numpy array at this time, because the len(match_seq) is different
+    return match_seq_list
 
 
 # 对实时采集到的原始磁场序列进行重采样（以空间距离为尺度）
@@ -452,7 +454,7 @@ def transfer_axis_with_grad(transfer, x0, y0):
     return ans[0][0], ans[1][0], grad_xy
 
 
-# 计算残差平方和，论文公式4.8
+# 计算残差平方和，论文公式4.8 TODO:为什么不用平均残差？
 # 输入：重采样的：PDR实时地磁序列M1[M][mv, mh]，Mag_Map地磁序列M2[M][mv, mh]
 # 输出：残差平方和 S
 # 实现：欧氏距离
@@ -464,7 +466,7 @@ def cal_loss(mag_arr_1, mag_arr_2):
 
 
 # 高斯牛顿迭代法，实现论文公式4.11 4.12
-# TODO 注意写公式的时候一定要检查清楚变量含义和论文是否没错
+# TODO 检查清楚公式、变量含义和论文是否没错
 # 实现：仅计算两点之间的高斯牛顿迭代_transfer。 矩阵转置 arr.transpose，逆np.linalg.inv(arr)
 # 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]，重采样的PDR地磁mag_p[mv, mh]、指纹库的地磁mag_m[mv, mh]
 # 输出：单点迭代结果向量_transfer[3×1] --> [1×3]
@@ -480,7 +482,7 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
         _transfer = np.dot(np.dot(np.linalg.pinv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
                     np.dot(np.dot(np.linalg.pinv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
         # 如果A为非奇异方阵，pinv(A)=inv(A)，但却会耗费大量的计算时间，相比较而言，inv(A)花费更少的时间。
-        # print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
+        print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
         # return np.array([0, 0, 0])
 
     return _transfer.transpose()[0]
@@ -490,7 +492,7 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
 # 匹配全流程：
 # 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
 # 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
-def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size):
+def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size, step=1/1000):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
     pdr_xy = sparse_PDR_mag[:, 0:2]
     pdr_mvh = sparse_PDR_mag[:, 2:4]
@@ -511,6 +513,7 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     for xy in map_xy:
         mvh, grad = get_linear_map_mvh_with_grad(mag_map, xy[0], xy[1], block_size)
         if mvh[0] == -1 or mvh[1] == -1:
+            print("The out point is:", xy, ", [", xy//block_size, "]")
             out_of_map = True
             break
         map_mvh.append(mvh)
@@ -519,17 +522,17 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     mag_map_grads = np.array(mag_map_grads)
 
     # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
-    last_loss = cal_loss(pdr_mvh, map_mvh)
+    loss = cal_loss(pdr_mvh, map_mvh)
 
     # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)计算 _transfer
     new_transfer = last_transfer
     for mag_map_grad, xy_grad, mag_P, mag_M in zip(mag_map_grads, xy_grads, pdr_mvh, map_mvh):
-        t = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)
+        t = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M) * step
         new_transfer[0] += t[0]
         new_transfer[1] += t[1]
         new_transfer[2] += t[2]
 
     # NOTE:如果out_of_map = True，则last_loss无效
-    return out_of_map, last_loss, map_xy, new_transfer
+    return out_of_map, loss, map_xy, new_transfer
 
-# TODO 实时的采样缓冲池流程
+# TODO 添加绘制迭代轨迹的函数，删除那些print
