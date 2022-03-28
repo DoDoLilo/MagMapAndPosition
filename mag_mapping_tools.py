@@ -94,6 +94,7 @@ def get_mag_vh_2(ori, mag):
     return mv, mh
 
 
+# 输入：orientation[3], mag[3]
 def get_mag_vh_arr(arr_ori, arr_mag):
     list_mv_mh = []
     for i in range(0, len(arr_ori)):
@@ -184,7 +185,10 @@ def cal_weighted_average(candidates):
 
 # ---------------------2022/2/14----------------------------------------
 # 绘制二维坐标图
-def paint_xy(arr_x_y):
+def paint_xy(arr_x_y, iter_num):
+    plt.xlim(0, 8)
+    plt.ylim(0, 13)
+    plt.title("Iteration:{0}".format(iter_num))
     plt.scatter(arr_x_y[:, 0], arr_x_y[:, 1])
     plt.show()
     return
@@ -196,7 +200,7 @@ def paint_xy(arr_x_y):
 # 思路：①将机房固定分块；②落于同一块中的x_y_GT的对应mv_mh进行平均
 # 实现：arr_1保存平均结果， arr_2保存落入当前块的点个数 n
 def build_rast_mv_mh(arr_mv_mh, arr_xy_gt, map_size_x, map_size_y, block_size):
-    # 先根据地图、块大小，计算块的个数，得到数组的长度。向上取整？
+    # 先根据地图、块大小，计算块的个数，得到数组的长度。向上取整
     shape = [math.ceil(map_size_x / block_size), math.ceil(map_size_y / block_size), 2]
     rast_mv_mh = np.empty(shape, dtype=float)
     # 不用考虑平均前求sum时候的溢出情况? sys.float_info.max（1.7976931348623157e + 308）
@@ -243,7 +247,6 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输入：原始csv文件路径file_paths
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
-# TODO:滤波
 def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
                        delete=False, delete_level=0):
     if len(file_paths) == 0:
@@ -259,17 +262,20 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
         data_ori = np.vstack((data_ori, data_all[:, 18:21]))
         data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
     # 地磁总强度，垂直、水平分量，
-    data_magnitude = cal_magnitude(data_mag)
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
-    # TODO emd滤波
-
+    # emd滤波，太慢了，不过是建库阶段，无所谓
+    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 4)
+    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 4)
+    # paint_signal(mv_filtered_emd)
+    # paint_signal(mh_filtered_emd)
+    arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
     # 内插填补，绘制结果
     paint_heat_map(rast_mv_mh)
     rast_mv_mh_raw = rast_mv_mh.copy()
-    fill_num = inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
     # paint_heat_map(rast_mv_mh, fill_num)
     if delete:
         delete_far_blocks(rast_mv_mh_raw, rast_mv_mh, radius, block_size, delete_level)
@@ -466,7 +472,6 @@ def cal_loss(mag_arr_1, mag_arr_2):
 
 
 # 高斯牛顿迭代法，实现论文公式4.11 4.12
-# TODO 检查清楚公式、变量含义和论文是否没错
 # 实现：仅计算两点之间的高斯牛顿迭代_transfer。 矩阵转置 arr.transpose，逆np.linalg.inv(arr)
 # 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]，重采样的PDR地磁mag_p[mv, mh]、指纹库的地磁mag_m[mv, mh]
 # 输出：单点迭代结果向量_transfer[3×1] --> [1×3]
@@ -492,7 +497,7 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
 # 匹配全流程：
 # 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
 # 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
-def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size, step=1/1000):
+def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size, step=1 / 1000):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
     pdr_xy = sparse_PDR_mag[:, 0:2]
     pdr_mvh = sparse_PDR_mag[:, 2:4]
@@ -513,7 +518,7 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     for xy in map_xy:
         mvh, grad = get_linear_map_mvh_with_grad(mag_map, xy[0], xy[1], block_size)
         if mvh[0] == -1 or mvh[1] == -1:
-            print("The out point is:", xy, ", [", xy//block_size, "]")
+            print("The out point is:", xy, ", [", xy // block_size, "]")
             out_of_map = True
             break
         map_mvh.append(mvh)
@@ -535,4 +540,27 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     # NOTE:如果out_of_map = True，则last_loss无效
     return out_of_map, loss, map_xy, new_transfer
 
+
 # TODO 添加绘制迭代轨迹的函数，删除那些print
+# 输入：建图各种参数：图长宽、块大小，绘图轨迹序列(已经栅格化的)，迭代次数，
+# 思路：创建和mag_map一样大小的二维空数组，在其中绘图，如果两次序列一样，则不绘图
+def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy, num):
+    # 先根据地图、块大小，计算块的个数，得到数组的长度。向上取整
+    shape = [math.ceil(map_size_x / block_size), math.ceil(map_size_y / block_size)]
+    map = np.zeros(shape, dtype=float)
+    different = False
+    for last, new in zip(last_xy, new_xy):
+        if last[0] != new[0] or last[1] != new[1]:
+            different = True
+            break
+
+    if different:
+        for new in new_xy:
+            map[int(new[0])][int(new[1])] = 1.
+        plt.figure(figsize=(19, 10))
+        plt.title('Iteration_' + str(num))
+        sns.set(font_scale=0.8)
+        sns.heatmap(map, cmap='YlOrRd', annot=False)
+        plt.show()
+
+    return
