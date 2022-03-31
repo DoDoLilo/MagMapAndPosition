@@ -61,13 +61,13 @@ file_paths_build_map = [
 
 # MMT.paint_heat_map(np.array(x_y_list))
 
-# path = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
-# data_all = MMT.get_data_from_csv(path)
-# data_mag = data_all[:, 21:24]
-# data_g = data_all[:, 24:27]
-# data_ori = data_all[:, 18:21]
-# data_x_y = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
-#
+path = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
+data_all = MMT.get_data_from_csv(path)
+data_mag = data_all[:, 21:24]
+data_g = data_all[:, 24:27]
+data_ori = data_all[:, 18:21]
+data_x_y = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
+
 # # 地磁总强度，垂直、水平分量，
 # data_magnitude = MMT.cal_magnitude(data_mag)
 # arr_mv_mh = MMT.get_mag_hv_arr(data_ori, data_mag)

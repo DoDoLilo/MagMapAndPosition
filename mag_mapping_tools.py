@@ -185,10 +185,10 @@ def cal_weighted_average(candidates):
 
 # ---------------------2022/2/14----------------------------------------
 # 绘制二维坐标图
-def paint_xy(arr_x_y, iter_num):
+def paint_xy(arr_x_y, title=None):
     plt.xlim(0, 8)
     plt.ylim(0, 13)
-    plt.title("Iteration:{0}".format(iter_num))
+    plt.title(title)
     plt.scatter(arr_x_y[:, 0], arr_x_y[:, 1])
     plt.show()
     return
@@ -264,8 +264,8 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     # 地磁总强度，垂直、水平分量，
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # emd滤波，太慢了，不过是建库阶段，无所谓
-    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 4)
-    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 4)
+    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 3)
+    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 3)
     # paint_signal(mv_filtered_emd)
     # paint_signal(mh_filtered_emd)
     arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
@@ -353,11 +353,16 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # 实现：1、计算mv,mh; 2、计算PDR累计距离
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
 # TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
-#  NOTE:此时data_mag\ori还需与PDR_x_y对齐后再输入， 输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
+#  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
+#  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度不一样
 def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+    # 滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波？
+    # mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 3)
+    # mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 3)
+    # arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # for遍历data_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
     i_start = 0
     i_mid = -1
@@ -369,6 +374,9 @@ def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
     for i in range(1, len(data_xy)):
         dis_sum_temp += math.hypot(data_xy[i][0] - data_xy[i - 1][0], data_xy[i][1] - data_xy[i - 1][1])
         if dis_sum_temp >= down_sip_dis:
+            # 当PDR仅两帧之间距离直接> 0.3m，则会导致连续进入该flow，使得 i_mid=-1
+            if i_mid == -1:
+                i_mid = i_start
             match_seq.append(down_sampling(i_start, i_mid, i, data_xy, arr_mv_mh))
             i_start = i
             i_mid = -1
@@ -460,6 +468,16 @@ def transfer_axis_with_grad(transfer, x0, y0):
     return ans[0][0], ans[1][0], grad_xy
 
 
+# 输入：轨迹序列，转换向量
+# 输出：转换后的轨迹list
+def transfer_axis_list(pdr_xy, transfer):
+    map_xy = []
+    for xy in pdr_xy:
+        x, y, grad = transfer_axis_with_grad(transfer, xy[0], xy[1])
+        map_xy.append([x, y])
+    return map_xy
+
+
 # 计算残差平方和，论文公式4.8 TODO:为什么不用平均残差？
 # 输入：重采样的：PDR实时地磁序列M1[M][mv, mh]，Mag_Map地磁序列M2[M][mv, mh]
 # 输出：残差平方和 S
@@ -487,8 +505,7 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
         _transfer = np.dot(np.dot(np.linalg.pinv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
                     np.dot(np.dot(np.linalg.pinv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
         # 如果A为非奇异方阵，pinv(A)=inv(A)，但却会耗费大量的计算时间，相比较而言，inv(A)花费更少的时间。
-        print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
-        # return np.array([0, 0, 0])
+        # print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
 
     return _transfer.transpose()[0]
 
@@ -497,14 +514,14 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
 # 匹配全流程：
 # 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
 # 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
-def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, block_size, step=1 / 1000):
+def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_size, step=1 / 1000):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
     pdr_xy = sparse_PDR_mag[:, 0:2]
     pdr_mvh = sparse_PDR_mag[:, 2:4]
     map_xy = []
     xy_grads = []
     for xy in pdr_xy:
-        x, y, grad = transfer_axis_with_grad(last_transfer, xy[0], xy[1])
+        x, y, grad = transfer_axis_with_grad(transfer, xy[0], xy[1])
         map_xy.append([x, y])
         xy_grads.append(grad)
     map_xy = np.array(map_xy)
@@ -530,7 +547,7 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     loss = cal_loss(pdr_mvh, map_mvh)
 
     # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)计算 _transfer
-    new_transfer = last_transfer
+    new_transfer = transfer
     for mag_map_grad, xy_grad, mag_P, mag_M in zip(mag_map_grads, xy_grads, pdr_mvh, map_mvh):
         t = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M) * step
         new_transfer[0] += t[0]
@@ -541,7 +558,6 @@ def cal_new_transfer_and_last_loss_xy(last_transfer, sparse_PDR_mag, mag_map, bl
     return out_of_map, loss, map_xy, new_transfer
 
 
-# TODO 添加绘制迭代轨迹的函数，删除那些print
 # 输入：建图各种参数：图长宽、块大小，绘图轨迹序列(已经栅格化的)，迭代次数，
 # 思路：创建和mag_map一样大小的二维空数组，在其中绘图，如果两次序列一样，则不绘图
 def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy, num):
@@ -564,3 +580,4 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
         plt.show()
 
     return
+
