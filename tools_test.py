@@ -44,7 +44,7 @@ file_paths_build_map = [
 #     delete_level=DELETE_LEVEL
 # )
 
-# # TODO NOTE测试阶段也使用建库的文件进行测试
+#
 # file_path_test = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
 # data_all = MMT.get_data_from_csv(file_path_test)
 # data_mag = data_all[:, 21:24]
@@ -69,12 +69,13 @@ data_ori = data_all[:, 18:21]
 data_x_y = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
 
 # # 地磁总强度，垂直、水平分量，
-# data_magnitude = MMT.cal_magnitude(data_mag)
+data_magnitude = MMT.cal_magnitude(data_mag)
 # arr_mv_mh = MMT.get_mag_hv_arr(data_ori, data_mag)
-# # emd滤波
-# # mv_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 0], 4)
-# # mh_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 1], 4)
-# # magnitude_filtered_emd = MMT.lowpass_emd(data_magnitude, 4)
+# emd滤波
+# mv_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 0], 4)
+# mh_filtered_emd = MMT.lowpass_emd(arr_mv_mh[:, 1], 4)
+magnitude_filtered_emd = MMT.lowpass_emd(data_magnitude, 3)
+MMT.paint_signal(magnitude_filtered_emd)
 # # 坐标变换
 # MMT.change_axis(data_x_y, MOVE_X, MOVE_Y)
 # rast_mv_mh = MMT.build_rast_mv_mh(arr_mv_mh, data_x_y, MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE)
@@ -98,8 +99,8 @@ data_x_y = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
 # print(MMT.cal_GaussNewton_increment(np.array([[[1, 1]], [[3, 4]]]), np.array([[5, 6, 7], [8, 9, 10]]),
 #       np.array([2, 2]), np.array([1, 1])))
 
-arr1 = np.array([1,2,3,4,5,6])
-arr2 = np.array([7,8,9,10,11,12])
-arr3 = np.vstack((arr1,arr2))
-print(arr3)
-print(arr3.transpose())
+# arr1 = np.array([1,2,3,4,5,6])
+# arr2 = np.array([7,8,9,10,11,12])
+# arr3 = np.vstack((arr1,arr2))
+# print(arr3)
+# print(arr3.transpose())

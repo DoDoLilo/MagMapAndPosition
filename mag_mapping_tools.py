@@ -266,8 +266,6 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     # emd滤波，太慢了，不过是建库阶段，无所谓
     mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 3)
     mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 3)
-    # paint_signal(mv_filtered_emd)
-    # paint_signal(mh_filtered_emd)
     arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
@@ -356,13 +354,14 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度不一样
-def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy):
+def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_filter=False):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # 滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波？
-    # mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 3)
-    # mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 3)
-    # arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+    if do_filter:
+        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 2)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 2)
+        arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # for遍历data_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
     i_start = 0
     i_mid = -1

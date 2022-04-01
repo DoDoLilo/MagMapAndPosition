@@ -19,57 +19,81 @@ INTER_TIME_THR = 2
 DELETE_LEVEL = 0
 # ------------------------
 # 缓冲池大小，单位（m）
-BUFFER_DIS = 10
-# 下采样粒度，应为块大小的整数倍
+BUFFER_DIS = 5
+# 下采样粒度，应为块大小的整数倍？（下采样越小，匹配难度越大！）
 DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
 MAX_ITERATION = 50
 # 目标损失
-TARGET_LOSS = BUFFER_DIS/BLOCK_SIZE * 40
+TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 45
+
+print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-STEP = 1 / 100000
+STEP = 1 / 150000
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域
-START_TRANSFERS = [[7., 8., math.radians(0.)],
-                   [7., 8.5, math.radians(0.)],
-                   [7., 7.5, math.radians(0.)],
-                   [6.5, 8., math.radians(0.)],
-                   [6.5, 8.5, math.radians(0.)],
-                   [6.5, 7.5, math.radians(0.)],
-                   [7.5, 8., math.radians(0.)],
-                   [7.5, 8.5, math.radians(0.)],
-                   [7.5, 7.5, math.radians(0.)]]
+START_TRANSFERS = [
+    [7., 8., math.radians(0.)],
+    [7., 8.25, math.radians(0.)], [7., 8.5, math.radians(0.)],
+    [7., 7.5, math.radians(0.)], [7., 7.75, math.radians(0.)],
+    [6.5, 8., math.radians(0.)], [6.75, 8., math.radians(0.)],
+    [6.5, 8.5, math.radians(0.)], [6.75, 8.5, math.radians(0.)],
+    [6.5, 8.25, math.radians(0.)], [6.75, 8.25, math.radians(0.)],
+    [6.5, 7.5, math.radians(0.)], [6.75, 7.5, math.radians(0.)],
+    [6.5, 7.75, math.radians(0.)], [6.75, 7.75, math.radians(0.)],
+    [7.5, 8., math.radians(0.)], [7.25, 8., math.radians(0.)],
+    [7.5, 8.5, math.radians(0.)], [7.5, 8.25, math.radians(0.)],
+    [7.25, 8.5, math.radians(0.)], [7.25, 8.25, math.radians(0.)],
+    [7.5, 7.5, math.radians(0.)], [7.25, 7.5, math.radians(0.)],
+    [7.5, 7.75, math.radians(0.)], [7.25, 7.75, math.radians(0.)]
+]
 
 
 def main():
     # 全流程
     # 1、建库
-    file_paths_build_map = [
-        "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
-        "data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv",
-        "data/data_test/data_to_building_map/IMU-10-3-170.97105500171142 Pixel 6_sync.csv",
-        "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv",
-        "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
-        "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
-    ]
-
-    mag_map = MMT.build_map_by_files(
-        file_paths=file_paths_build_map,
-        move_x=MOVE_X, move_y=MOVE_Y,
-        map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
-        # time_thr=INTER_TIME_THR,
-        radius=INTER_RADIUS, block_size=BLOCK_SIZE,
-        delete=True,
-        delete_level=DELETE_LEVEL
-    )
-
+    # file_paths_build_map = [
+    #     "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
+    #     "data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv",
+    #     "data/data_test/data_to_building_map/IMU-10-3-170.97105500171142 Pixel 6_sync.csv",
+    #     "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv",
+    #     "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv",
+    #     "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"
+    # ]
+    #
+    # mag_map = MMT.build_map_by_files(
+    #     file_paths=file_paths_build_map,
+    #     move_x=MOVE_X, move_y=MOVE_Y,
+    #     map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
+    #     # time_thr=INTER_TIME_THR,
+    #     radius=INTER_RADIUS, block_size=BLOCK_SIZE,
+    #     delete=True,
+    #     delete_level=DELETE_LEVEL
+    # )
+    # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
+    mag_map_mv = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mv.csv', delimiter=','))
+    mag_map_mh = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mh.csv', delimiter=','))
+    mag_map = []
+    for i in range(0, len(mag_map_mv)):
+        temp = []
+        for j in range(0, len(mag_map_mv[0])):
+            temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
+        mag_map.append(temp)
+    mag_map = np.array(mag_map)
+    # MMT.paint_heat_map(mag_map)
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
-    file_to_match = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
+    # TODO 如果3.1失败则重新给出 BUFFER_DIS\DOWN_SIP_DIS\TARGET_LOSS重新开始？
+    # file_to_match = "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"
+    # file_to_match = "data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"
+    # file_to_match = "data/data_test/data_server_room/IMU-1-2-191.47707604211791 Pixel 3a_sync.csv"
+    # file_to_match = "data/data_test/data_server_room/IMU-2-1-193.76517575369385 Pixel 6_sync_Error.csv"
+    # file_to_match = "data/data_test/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"
+    file_to_match = "data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"
     pdr_data_all = MMT.get_data_from_csv(file_to_match)
     pdr_data_mag = pdr_data_all[:, 21:24]
     pdr_data_ori = pdr_data_all[:, 18:21]
     pdr_data_xy = pdr_data_all[:, np.shape(pdr_data_all)[1] - 5:np.shape(pdr_data_all)[1] - 3]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy)
+    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy, do_filter=False)
 
     # 3、手动给出初始transfer_0，注意单条
     # 根据匹配段进行迭代，3种迭代结束情况：
@@ -83,8 +107,8 @@ def main():
     # 那么，结束条件应该为相同的迭代次数，而非loss阈值
     # 如果越界，则保存越界前的最后一次轨迹
     candidates_loss_xy_tf = []
-    last_loss_xy_tf_num = None
     for tf in START_TRANSFERS:
+        last_loss_xy_tf_num = None
         for iter_num in range(0, MAX_ITERATION):
             out_of_map, loss, map_xy, tf = MMT.cal_new_transfer_and_last_loss_xy(
                 tf, first_match, mag_map, BLOCK_SIZE, STEP
@@ -121,7 +145,9 @@ def main():
         print("\nMatch Seq:{0}   --------------------------".format(i))
         iter_num = 0
         loss_list = []
-        last_transfer = transfer
+        # *NOTE: Use copy() if just pointer copy caused data changed in the last_transfer TODO 检查其他地方有没有！
+        last_transfer = transfer.copy()
+        print("last_transfer:", transfer)
         while True:
             iter_num += 1
             out_of_map, loss, map_xy, transfer = MMT.cal_new_transfer_and_last_loss_xy(
@@ -135,17 +161,18 @@ def main():
                 # 失败了怎么办？提前结束？or 相信PDR不改变transfer？or 使用最小loss的transfer ？
                 # 选择：相信PDR和之前的transfer
                 # NOTE:失败了还要还原之前的transfer，因为迭代过程中transfer一直在变化！！！
-                print("中间轨迹匹配失败！选择：相信PDR和之前的transfer")
-                transfer = last_transfer
+                transfer = last_transfer.copy()
+                print("中间轨迹匹配失败！选择：相信PDR和之前的transfer", transfer)
                 map_xy_list.append(MMT.transfer_axis_list(match_seq[:, 0:2], transfer))
                 break
             if loss <= TARGET_LOSS:
                 print("Match Seq:", i, "iteration ", iter_num, ", Succeed!")
+                print("Transfer changed: ", transfer)
                 # 成功了怎么办？加到结果中，提前结束迭代
                 map_xy_list.append(map_xy)
                 break
 
-        print(loss_list)
+        print("Loss list:", loss_list)
 
     final_xy = []
     for map_xy in map_xy_list:
