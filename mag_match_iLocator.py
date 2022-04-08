@@ -30,7 +30,7 @@ TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 45
 print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 STEP = 1 / 150000
-# 首次迭代固定区域遍历数组，默认起点在某一固定区域
+# 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，先绕原坐标原点逆时针旋转，然后再平移
 START_TRANSFERS = [
     [7., 8., math.radians(0.)],
     [7., 8.25, math.radians(0.)], [7., 8.5, math.radians(0.)],
@@ -86,14 +86,14 @@ def main():
     # file_to_match = "data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"
     # file_to_match = "data/data_test/data_server_room/IMU-1-2-191.47707604211791 Pixel 3a_sync.csv"
     # file_to_match = "data/data_test/data_server_room/IMU-2-1-193.76517575369385 Pixel 6_sync_Error.csv"
-    # file_to_match = "data/data_test/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"
-    file_to_match = "data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"
+    file_to_match = "data/data_test/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"
+    # file_to_match = "data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"
     pdr_data_all = MMT.get_data_from_csv(file_to_match)
     pdr_data_mag = pdr_data_all[:, 21:24]
     pdr_data_ori = pdr_data_all[:, 18:21]
     pdr_data_xy = pdr_data_all[:, np.shape(pdr_data_all)[1] - 5:np.shape(pdr_data_all)[1] - 3]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy, do_filter=False)
+    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy, do_filter=True)
 
     # 3、手动给出初始transfer_0，注意单条
     # 根据匹配段进行迭代，3种迭代结束情况：
@@ -145,7 +145,7 @@ def main():
         print("\nMatch Seq:{0}   --------------------------".format(i))
         iter_num = 0
         loss_list = []
-        # *NOTE: Use copy() if just pointer copy caused data changed in the last_transfer TODO 检查其他地方有没有！
+        # *NOTE: Use copy() if just pointer copy caused data changed in the last_transfer
         last_transfer = transfer.copy()
         print("last_transfer:", transfer)
         while True:
@@ -179,7 +179,7 @@ def main():
         for xy in map_xy:
             final_xy.append(xy)
     final_xy = np.array(final_xy)
-    MMT.paint_xy(final_xy, "The final xy")
+    MMT.paint_xy(final_xy, "The final xy", [0, MAP_SIZE_X, 0, MAP_SIZE_Y])
     return
 
 

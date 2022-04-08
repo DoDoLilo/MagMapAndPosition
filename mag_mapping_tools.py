@@ -185,9 +185,11 @@ def cal_weighted_average(candidates):
 
 # ---------------------2022/2/14----------------------------------------
 # 绘制二维坐标图
-def paint_xy(arr_x_y, title=None):
-    plt.xlim(0, 8)
-    plt.ylim(0, 13)
+def paint_xy(arr_x_y, title=None, xy_range=None):
+    if xy_range is not None:
+        plt.figure(figsize=(xy_range[1]-xy_range[0], xy_range[3]-xy_range[2]))
+        plt.xlim(xy_range[0], xy_range[1])
+        plt.ylim(xy_range[2], xy_range[3])
     plt.title(title)
     plt.scatter(arr_x_y[:, 0], arr_x_y[:, 1])
     plt.show()
@@ -350,7 +352,7 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # 采样缓冲池_非实时（也使用累积距离）包括稀疏采样处理
 # 实现：1、计算mv,mh; 2、计算PDR累计距离
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
-# TODO:正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
+# 正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度不一样
@@ -373,20 +375,23 @@ def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_fil
     for i in range(1, len(data_xy)):
         dis_sum_temp += math.hypot(data_xy[i][0] - data_xy[i - 1][0], data_xy[i][1] - data_xy[i - 1][1])
         if dis_sum_temp >= down_sip_dis:
-            # 当PDR仅两帧之间距离直接> 0.3m，则会导致连续进入该flow，使得 i_mid=-1
+            # 当PDR仅两帧之间距离直接> down_sip_dis，则会导致连续进入该flow，使得 i_mid=-1
             if i_mid == -1:
                 i_mid = i_start
             match_seq.append(down_sampling(i_start, i_mid, i, data_xy, arr_mv_mh))
             i_start = i
             i_mid = -1
             dis_sum_all += dis_sum_temp
-            dis_sum_temp -= down_sip_dis
+            # dis_sum_temp -= down_sip_dis 这样写虽然很真实，但会导致dis_sum_temp与i_mid_xy含义不一致，
+            # 之前的会影响后续的，而且在dis_sum_all+= dis_sum_temp的时候会重复加上之前未清0的距离
+            dis_sum_temp = 0
         else:
             if i_mid == -1 and dis_sum_temp >= dis_mid:
                 i_mid = i
 
         if dis_sum_all >= buffer_dis:
-            dis_sum_all -= buffer_dis
+            # dis_sum_all -= buffer_dis 这样写，之前的会影响后续的
+            dis_sum_all = 0
             match_seq_list.append(match_seq.copy())
             match_seq.clear()
 
@@ -580,3 +585,35 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
 
     return
 
+
+# ----------------PDR相关--------------------------------
+# PDR window size = 200，simple frequency=200Hz/s，sliding window size=10
+# 而PDR模型输出为该窗口的平均速度v，认为该1秒的窗口速度相同，每 10/200s = 0.05s输出一速度
+# 得到的PDR_x,y是该速度v*0.05s，而我们的PDR程序第一个200窗口乘的是0.05s而不是1.0s
+# 所以PDR_x,y[0..i..]对应的时间应该为 i*0.05s，对应的数据帧为 i*10
+# 一个PDR_x,y坐标应该对应一个地磁值，和根据距离下采样时保持一致，该地磁值也应该用平均值！
+# 和simpl_buffer里的一致，达到距离阈值，则返回该段均值和该段mid坐标
+
+# ***所以PDR_x,y[i]对应的地磁 = mean( raw_mag[ i*10-5 : i*10 + 5] ); 不包括 +5
+
+# 函数：获取pdr坐标对应的地磁、方向原始数据
+# 输入：pdr_xy[n1][2]=pdr模型输出的20Hz/s的xy序列, raw_mag[n2][3]=pdr对应的原始手机200Hz数据中的地磁，raw_ori[n2][3]=方向，
+#      mean=False则使用单点地磁,=TODO True表示结果地磁使用平均值（如果要平均则得先根据ori将mag转为mv\mh才可平均）
+# 输出：PDR_xy_mag_ori[2+3+3=8]矩阵，[x,y, mag[0],mag[1],mag[2], ori[0],ori[1],ori[2]]
+def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, simpling_frequency=200, mean=False):
+    step = int(simpling_frequency/pdr_frequency)
+    if step < 1:
+        print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
+        return None
+
+    PDR_xy_mag_ori = []
+    for i in range(0, len(pdr_xy)):
+        raw_i = i * step
+        # 越界则提前跳出循环，按理说正确的[pdr_frequency, simpling_frequency]不会有这种情况
+        if raw_i >= len(raw_mag):
+            print("get_PDR_xy_mag_ori(): Drop out in break!")
+            break
+        PDR_xy_mag_ori.append([pdr_xy[i][0], pdr_xy[i][1],
+                               raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
+                               raw_ori[raw_i][0], raw_ori[raw_i][1], raw_ori[raw_i][2]])
+    return np.array(PDR_xy_mag_ori)
