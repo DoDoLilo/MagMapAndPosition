@@ -175,9 +175,10 @@ def cal_weighted_average(candidates):
     mv_ave = 0
     mh_ave = 0
     for c in candidates:
-        weight_all += c[2]
+        # 距离distance越大，权重越小
+        weight_all += 1 / c[2]
     for c in candidates:
-        w = c[2] / weight_all
+        w = (1 / c[2]) / weight_all
         mv_ave += w * c[0]
         mh_ave += w * c[1]
     return mv_ave, mh_ave
@@ -187,7 +188,7 @@ def cal_weighted_average(candidates):
 # 绘制二维坐标图
 def paint_xy(arr_x_y, title=None, xy_range=None):
     if xy_range is not None:
-        plt.figure(figsize=(xy_range[1]-xy_range[0], xy_range[3]-xy_range[2]))
+        plt.figure(figsize=(xy_range[1] - xy_range[0], xy_range[3] - xy_range[2]))
         plt.xlim(xy_range[0], xy_range[1])
         plt.ylim(xy_range[2], xy_range[3])
     plt.title(title)
@@ -601,7 +602,7 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
 #      mean=False则使用单点地磁,=TODO True表示结果地磁使用平均值（如果要平均则得先根据ori将mag转为mv\mh才可平均）
 # 输出：PDR_xy_mag_ori[2+3+3=8]矩阵，[x,y, mag[0],mag[1],mag[2], ori[0],ori[1],ori[2]]
 def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, simpling_frequency=200, mean=False):
-    step = int(simpling_frequency/pdr_frequency)
+    step = int(simpling_frequency / pdr_frequency)
     if step < 1:
         print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
         return None
