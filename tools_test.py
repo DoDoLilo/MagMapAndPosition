@@ -128,6 +128,7 @@ pdr_xy = np.load(path_pdr_raw[0])[:, 0:2]
 data_all = MMT.get_data_from_csv(path_pdr_raw[1])
 raw_mag = data_all[:, 21:24]
 raw_ori = data_all[:, 18:21]
+raw_xy = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
 PDR_xy_mag_ori = MMT.get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori)
 pdr_data_mag = PDR_xy_mag_ori[:, 2:5]
 pdr_data_ori = PDR_xy_mag_ori[:, 5:8]
@@ -147,5 +148,7 @@ for map_xy in map_xy_list:
 final_xy = np.array(final_xy)
 MMT.paint_xy(pdr_xy)
 MMT.paint_xy(final_xy)
-new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.682912146175308, 1.7343581967157702, math.radians(-88.)]))
+new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.75, 1.0, math.radians(-89.)]))
 MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
+MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
+MMT.paint_xy(raw_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])

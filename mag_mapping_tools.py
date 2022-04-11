@@ -499,27 +499,29 @@ def cal_loss(mag_arr_1, mag_arr_2):
 # 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]，重采样的PDR地磁mag_p[mv, mh]、指纹库的地磁mag_m[mv, mh]
 # 输出：单点迭代结果向量_transfer[3×1] --> [1×3]
 # NOTE：[1,2,3].shape不是[1×3]而是[0×3]， [[1,2,3]]才是[1×3] ！！！
-def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M):
+def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse):
     m0 = np.dot(mag_map_grad[0], xy_grad)
     m1 = np.dot(mag_map_grad[1], xy_grad)
-
-    try:
-        _transfer = np.dot(np.dot(np.linalg.inv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
-                    np.dot(np.dot(np.linalg.inv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
-    except np.linalg.LinAlgError:
-        _transfer = np.dot(np.dot(np.linalg.pinv(np.dot(m0.transpose(), m0)), m0.transpose()), mag_P[0] - mag_M[0]) + \
-                    np.dot(np.dot(np.linalg.pinv(np.dot(m1.transpose(), m1)), m1.transpose()), mag_P[1] - mag_M[1])
-        # 如果A为非奇异方阵，pinv(A)=inv(A)，但却会耗费大量的计算时间，相比较而言，inv(A)花费更少的时间。
-        # print("不存在逆矩阵，能用伪逆替代吗？np.linalg.pinv(H)")
-
+    _transfer = np.dot(matrix_H_inverse,
+                       np.dot(m0.transpose(), mag_P[0] - mag_M[0]) + np.dot(m1.transpose(), mag_P[1] - mag_M[1]))
     return _transfer.transpose()[0]
+
+
+# 计算高斯牛顿公式计算过程中的中间矩阵H
+# 输入：地磁梯度矩阵mag_map_grads[2][1×2]， 坐标梯度矩阵xy_grad[2×3]
+# 输出：计算后的中间矩阵H
+def cal_matrix_H(mag_map_grad, xy_grad):
+    m0 = np.dot(mag_map_grad[0], xy_grad)
+    m1 = np.dot(mag_map_grad[1], xy_grad)
+    matrix_H = np.dot(m0.transpose(), m0) + np.dot(m1.transpose(), m1)
+    return matrix_H
 
 
 # 注意全流程的时候进行-1检查！
 # 匹配全流程：
 # 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
 # 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
-def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_size, step=1 / 1000):
+def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_size, step):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
     pdr_xy = sparse_PDR_mag[:, 0:2]
     pdr_mvh = sparse_PDR_mag[:, 2:4]
@@ -551,13 +553,23 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
     # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
     loss = cal_loss(pdr_mvh, map_mvh)
 
-    # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M)计算 _transfer
+    # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step计算 _transfer
     new_transfer = transfer
+    #    4.1 计算 H 及其 逆
+    matrix_H = np.zeros([3, 3], dtype=float)
+    for mag_map_grad, xy_grad in zip(mag_map_grads, xy_grads):
+        matrix_H += cal_matrix_H(mag_map_grad, xy_grad)
+
+    try:
+        matrix_H_inverse = np.linalg.inv(matrix_H)
+    except np.linalg.LinAlgError:
+        matrix_H_inverse = np.linalg.pinv(matrix_H)
+    #    4.2 计算 _transfer 及其总和
     for mag_map_grad, xy_grad, mag_P, mag_M in zip(mag_map_grads, xy_grads, pdr_mvh, map_mvh):
-        t = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M) * step
-        new_transfer[0] += t[0]
-        new_transfer[1] += t[1]
-        new_transfer[2] += t[2]
+        _transfer = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step
+        new_transfer[0] += _transfer[0]
+        new_transfer[1] += _transfer[1]
+        new_transfer[2] += _transfer[2]
 
     # NOTE:如果out_of_map = True，则last_loss无效
     return out_of_map, loss, map_xy, new_transfer

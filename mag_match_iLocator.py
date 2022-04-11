@@ -23,13 +23,13 @@ BUFFER_DIS = 5
 # 下采样粒度，应为块大小的整数倍？（下采样越小，匹配难度越大！）
 DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
-MAX_ITERATION = 50
+MAX_ITERATION = 100
 # 目标损失
 TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 45
 
 print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-STEP = 1 / 150000
+STEP = 1 / 75
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，先绕原坐标原点逆时针旋转，然后再平移
 START_TRANSFERS = [
     [7., 8., math.radians(0.)],
