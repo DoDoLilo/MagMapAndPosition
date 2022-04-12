@@ -28,10 +28,13 @@ MAX_ITERATION = 100
 TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 35
 print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-STEP = 1 / 75
+STEP = 1 / 70
+# 原始数据采样频率 , PDR坐标输出频率
+SAMPLE_FREQUENCY = 200
+PDR_XY_FREQUENCY = 20
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # 先绕原坐标原点逆时针旋转，然后再平移
-START_TRANSFERS = [
+start_transfers = [
     [7, 1.0, math.radians(-89.)], [7, 1.25, math.radians(-89.)], [7, 1.5, math.radians(-89.)],
     [7, 1.75, math.radians(-89.)], [7, 2.0, math.radians(-89.)], [7, 2.25, math.radians(-89.)],
     [7, 0.5, math.radians(-89.)], [7, 0.75, math.radians(-89.)], [7, 2.5, math.radians(-89.)],
@@ -74,13 +77,9 @@ def main():
     data_all = MMT.get_data_from_csv(path_pdr_raw[1])
     raw_mag = data_all[:, 21:24]
     raw_ori = data_all[:, 18:21]
-    PDR_xy_mag_ori = MMT.get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori)
-    pdr_data_mag = PDR_xy_mag_ori[:, 2:5]
-    pdr_data_ori = PDR_xy_mag_ori[:, 5:8]
-    pdr_data_xy = pdr_xy
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy,
-                                        do_filter=True)
+    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy, do_filter=True,
+                                            pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
 
     # 3、手动给出初始transfer_0，注意单条
     # 根据匹配段进行迭代，3种迭代结束情况：
@@ -94,7 +93,7 @@ def main():
     # 那么，结束条件应该为相同的迭代次数，而非loss阈值
     # 如果越界，则保存越界前的最后一次轨迹
     candidates_loss_xy_tf = []
-    for tf in START_TRANSFERS:
+    for tf in start_transfers:
         last_loss_xy_tf_num = None
         for iter_num in range(0, MAX_ITERATION):
             out_of_map, loss, map_xy, tf = MMT.cal_new_transfer_and_last_loss_xy(

@@ -356,7 +356,7 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # 正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
-# 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度不一样
+# 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
 def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_filter=False):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
@@ -609,19 +609,19 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
 
 # ***所以PDR_x,y[i]对应的地磁 = mean( raw_mag[ i*10-5 : i*10 + 5] ); 不包括 +5
 
-# 函数：获取pdr坐标对应的地磁、方向原始数据
+# 函数：获取pdr坐标对应的地磁、方向原始数据(非平均)
 # 输入：pdr_xy[n1][2]=pdr模型输出的20Hz/s的xy序列, raw_mag[n2][3]=pdr对应的原始手机200Hz数据中的地磁，raw_ori[n2][3]=方向，
-#      mean=False则使用单点地磁,=TODO True表示结果地磁使用平均值（如果要平均则得先根据ori将mag转为mv\mh才可平均）
+#      mean=False则使用单点地磁
 # 输出：PDR_xy_mag_ori[2+3+3=8]矩阵，[x,y, mag[0],mag[1],mag[2], ori[0],ori[1],ori[2]]
-def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, simpling_frequency=200, mean=False):
-    step = int(simpling_frequency / pdr_frequency)
-    if step < 1:
+def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_frequency=200):
+    window_size = int(sampling_frequency / pdr_frequency)
+    if window_size < 1:
         print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
         return None
 
     PDR_xy_mag_ori = []
     for i in range(0, len(pdr_xy)):
-        raw_i = i * step
+        raw_i = i * window_size
         # 越界则提前跳出循环，按理说正确的[pdr_frequency, simpling_frequency]不会有这种情况
         if raw_i >= len(raw_mag):
             print("get_PDR_xy_mag_ori(): Drop out in break!")
@@ -630,3 +630,116 @@ def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, simpling_freq
                                raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
                                raw_ori[raw_i][0], raw_ori[raw_i][1], raw_ori[raw_i][2]])
     return np.array(PDR_xy_mag_ori)
+
+
+# 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作
+# 输入：+ data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, ori/mag采样频率sampling_frequency=200
+# 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
+# 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
+def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_filter=False,
+                       pdr_frequency=20, sampling_frequency=200):
+    # 1.计算mv,mh分量,得到[N][mv, mh]
+    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+    # 2.滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波
+    if do_filter:
+        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 2)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 2)
+        arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+
+    # + 3.相比原来的samples_buffer()：
+    #    需要将原始高频arr_mv_mh 变为和 低频data_xy(pdr_xy) 对齐、平均后的和data_xy(PDR_xy)同频的arr_mv_mh
+    window_size = int(sampling_frequency / pdr_frequency)
+    if window_size < 1:
+        print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
+        return None
+
+    arr_mv_mh_pdr = []
+    for i in range(0, len(PDR_xy)):
+        raw_i = i * window_size
+        window_start = raw_i - int(window_size / 2)
+        window_end = raw_i + int(window_size / 2)
+        if window_start < 0:
+            window_start = 0
+        if window_end > len(data_mag):
+            window_end = len(data_mag)
+        if window_start < window_end:
+            # ！注意错误数组访问下标写法：arr_mv_mh[window_start:window_end][0]
+            arr_mv_mh_pdr.append([np.mean(arr_mv_mh[window_start:window_end, 0]),
+                                  np.mean(arr_mv_mh[window_start:window_end, 1])])
+        else:
+            break
+    arr_mv_mh = np.array(arr_mv_mh_pdr)
+    # + 相比原来的samples_buffer()  End
+
+    # 4. for遍历PDR_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
+    i_start = 0
+    i_mid = -1
+    dis_sum_temp = 0
+    dis_sum_all = 0
+    dis_mid = down_sip_dis / 2
+    match_seq_list = []
+    match_seq = []
+    # 使用len(arr_mv_mh)，而不是 len(PDR_xy)，因为经过 3. 后，前者有可能小于后者
+    for i in range(1, len(arr_mv_mh)):
+        dis_sum_temp += math.hypot(PDR_xy[i][0] - PDR_xy[i - 1][0], PDR_xy[i][1] - PDR_xy[i - 1][1])
+        if dis_sum_temp >= down_sip_dis:
+            # 当PDR仅两帧之间距离直接> down_sip_dis，则会导致连续进入该flow，使得 i_mid=-1
+            if i_mid == -1:
+                i_mid = i_start
+            match_seq.append(down_sampling(i_start, i_mid, i, PDR_xy, arr_mv_mh))
+            i_start = i
+            i_mid = -1
+            dis_sum_all += dis_sum_temp
+            # dis_sum_temp -= down_sip_dis 这样写虽然很真实，但会导致dis_sum_temp与i_mid_xy含义不一致，
+            # 之前的会影响后续的，而且在dis_sum_all+= dis_sum_temp的时候会重复加上之前未清0的距离
+            dis_sum_temp = 0
+        else:
+            if i_mid == -1 and dis_sum_temp >= dis_mid:
+                i_mid = i
+
+        if dis_sum_all >= buffer_dis:
+            # dis_sum_all -= buffer_dis 这样写，之前的会影响后续的
+            dis_sum_all = 0
+            match_seq_list.append(match_seq.copy())
+            match_seq.clear()
+
+    match_seq_list.append(match_seq)
+    # Don't change to numpy array at this time, because the len(match_seq) is different
+    return match_seq_list
+
+
+# 候选transfer向量生成器：
+# 输入一个向量，输出以该向量为中心，产生的一组用以小区域遍历的候选项。
+# 可自定义参数: transfer各维度分别的增减粒度、增减次数
+# 输入：初始向量original_transfer[△x, △y(米), △angle(弧度)]，
+#       自定义参数config[2][3]=[[x,y(米),angle(弧度)增减粒度],[x,y,angle增减次数]]
+# 输出：满足要求的候选transfer_candidates[m][3] （包括original_transfer）
+def produce_transfer_candidates(original_transfer, config):
+    transfer_candidates = []
+    # transfer_candidates.append(original_transfer)
+    x_candidates = []
+    y_candidates = []
+    angle_candidates = []
+    # for循环增减次数次，向各个参数list中添加
+    x_candidates.append(original_transfer[0])
+    for tx in range(1, config[1][0]):
+        x_candidates.append(original_transfer[0] + tx * config[0][0])
+        x_candidates.append(original_transfer[0] - tx * config[0][0])
+
+    y_candidates.append(original_transfer[1])
+    for ty in range(1, config[1][1]):
+        y_candidates.append(original_transfer[1] + ty * config[0][1])
+        y_candidates.append(original_transfer[1] - ty * config[0][1])
+
+    angle_candidates.append(original_transfer[2])
+    for ta in range(1, config[1][2]):
+        angle_candidates.append(original_transfer[2] + ta * config[0][2])
+        angle_candidates.append(original_transfer[2] - ta * config[0][2])
+
+    # 三重for循环将这些候选分量重组
+    for x in x_candidates:
+        for y in y_candidates:
+            for angle in angle_candidates:
+                transfer_candidates.append([x, y, angle])
+
+    return np.array(transfer_candidates)
