@@ -14,7 +14,7 @@ INTER_RADIUS = 1
 # 内插迭代次数上限
 INTER_TIME_THR = 2
 # 删除多余内插块的程度，越大删除的内插范围越大，可以为负值。
-DELETE_LEVEL = 0
+DELETE_LEVEL = -3
 
 file_paths_build_map = [
     "data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv",
@@ -37,6 +37,6 @@ mag_map = MMT.build_map_by_files(
 
 # mag_map保存到 data/data_test/mag_map
 # mag_map[i][j][mv][mh]
-np.savetxt('data/data_test/mag_map/mag_map_mv.csv', mag_map[:, :, 0], delimiter=',')
-np.savetxt('data/data_test/mag_map/mag_map_mh.csv', mag_map[:, :, 1], delimiter=',')
+np.savetxt('data/data_test/mag_map/mag_map_mv_full.csv', mag_map[:, :, 0], delimiter=',')
+np.savetxt('data/data_test/mag_map/mag_map_mh_full.csv', mag_map[:, :, 1], delimiter=',')
 

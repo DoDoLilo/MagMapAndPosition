@@ -28,46 +28,36 @@ BUFFER_DIS = 5
 DOWN_SIP_DIS = BLOCK_SIZE
 
 
-# path_pdr_raw = ["data/data_test/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy",
-#                 "data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
-#
-# pdr_xy = np.load(path_pdr_raw[0])[:, 0:2]
-# data_all = MMT.get_data_from_csv(path_pdr_raw[1])
-# raw_mag = data_all[:, 21:24]
-# raw_ori = data_all[:, 18:21]
-# raw_xy = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
-# PDR_xy_mag_ori = MMT.get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori)
-# pdr_data_mag = PDR_xy_mag_ori[:, 2:5]
-# pdr_data_ori = PDR_xy_mag_ori[:, 5:8]
-# pdr_data_xy = pdr_xy
-# # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-# match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy,
-#                                     do_filter=True)
-# map_xy_list = []
-# for i in range(0, len(match_seq_list)):
-#     match_seq = np.array(match_seq_list[i])
-#     map_xy_list.append(match_seq[:, 0:2])
-#
-# final_xy = []
-# for map_xy in map_xy_list:
-#     for xy in map_xy:
-#         final_xy.append(xy)
-# final_xy = np.array(final_xy)
-# # MMT.paint_xy(pdr_xy)
-# # MMT.paint_xy(final_xy)
-# new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.7, 1.7, math.radians(-97.)]))
-# MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
-# MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
-# MMT.paint_xy(raw_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
-# print("First Points, PDR:\n{0}, \niLocator:\n{1}, \n Sub:{2}".format(new_pdr_xy[0:5], raw_xy[0:5],
-#                                                                      [np.sum(raw_xy[0:10, 0]-new_pdr_xy[0:10, 0])/10,
-#                                                                       np.sum(raw_xy[0:10, 1]-new_pdr_xy[0:10, 1])/10]))
+path_pdr_raw = ["data/data_test/pdr/IMU-10-6-178.00767980919863 Pixel 6.csv.npy",
+                "data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"]
 
-original_transfer = [7, 2, math.radians(90.)]
-config = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
-transfer_candidates = MMT.produce_transfer_candidates(original_transfer, config)
+pdr_xy = np.load(path_pdr_raw[0])[:, 0:2]
+data_all = MMT.get_data_from_csv(path_pdr_raw[1])
+raw_mag = data_all[:, 21:24]
+raw_ori = data_all[:, 18:21]
+raw_xy = data_all[:, np.shape(data_all)[1]-5:np.shape(data_all)[1]-3]
+PDR_xy_mag_ori = MMT.get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori)
+pdr_data_mag = PDR_xy_mag_ori[:, 2:5]
+pdr_data_ori = PDR_xy_mag_ori[:, 5:8]
+pdr_data_xy = pdr_xy
+# 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
+match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy,
+                                    do_filter=True)
+map_xy_list = []
+for i in range(0, len(match_seq_list)):
+    match_seq = np.array(match_seq_list[i])
+    map_xy_list.append(match_seq[:, 0:2])
 
-for tc in transfer_candidates:
-    print("[{0},{1},{2}]".format(tc[0], tc[1], math.degrees(tc[2])))
+final_xy = []
+for map_xy in map_xy_list:
+    for xy in map_xy:
+        final_xy.append(xy)
+final_xy = np.array(final_xy)
+# MMT.paint_xy(pdr_xy)
+# MMT.paint_xy(final_xy)
+new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.9, 2.2, math.radians(-100.)]))
+MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
+MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
+MMT.paint_xy(raw_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
+print("First Points, PDR:\n{0}, \niLocator:\n{1}".format(new_pdr_xy[0:5], raw_xy[0:5]))
 
-print(len(transfer_candidates))

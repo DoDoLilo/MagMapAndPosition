@@ -668,7 +668,9 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_
                                   np.mean(arr_mv_mh[window_start:window_end, 1])])
         else:
             break
+    # paint_signal(arr_mv_mh[:, 1], "Before align with PDR")
     arr_mv_mh = np.array(arr_mv_mh_pdr)
+    # paint_signal(arr_mv_mh[:, 1], "After align with PDR")
     # + 相比原来的samples_buffer()  End
 
     # 4. for遍历PDR_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
@@ -743,3 +745,49 @@ def produce_transfer_candidates(original_transfer, config):
                 transfer_candidates.append([x, y, angle])
 
     return np.array(transfer_candidates)
+
+
+# TODO 小范围区域遍历函数，将mag_match_PDR.py中的3.1功能提取出来
+# 输入：用于生成transfer_candidates：初始变换向量original_transfer，范围参数area_config，
+#     用于高斯牛顿迭代的：待匹配序列match_seq，地磁地图mag_map，块大小block_size，迭代步长step，最大迭代次数max_iteration
+#     用于筛选候选项的：目标损失target_loss
+# 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
+# NOTE：注意 地址拷贝（浅拷贝） 和 值拷贝（深拷贝） 的问题。
+def produce_transfer_candidates_search_again(original_transfer, area_config,
+                                             match_seq, mag_map, block_size, step, max_iteration,
+                                             target_loss):
+    # 1.生成小范围的所有transfer_candidates
+    transfer_candidates = produce_transfer_candidates(original_transfer, area_config)
+
+    # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
+    candidates_loss_xy_tf = []
+    for transfer in transfer_candidates:
+        last_loss_xy_tf_num = None
+        for iter_num in range(0, max_iteration):
+            out_of_map, loss, map_xy, transfer = cal_new_transfer_and_last_loss_xy(
+                transfer, match_seq, mag_map, block_size, step
+            )
+            if not out_of_map:
+                last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+            else:
+                break
+
+        if last_loss_xy_tf_num is not None:
+            candidates_loss_xy_tf.append(last_loss_xy_tf_num)
+    # 3.选出候选集中Loss最小的项，返回其transfer；
+    #     若无候选项，则表示小范围寻找失败，返回original_transfer
+    transfer = None
+    min_loss = None
+    print("candidates loss:")
+    for c in candidates_loss_xy_tf:
+        print(c[0])
+        if c[0] < target_loss:
+            if min_loss is None or c[0] < min_loss:
+                min_loss = c[0]
+                transfer = c[2]
+
+    if transfer is None:
+        print("区域遍历失败，无法找到匹配轨迹！选择相信PDR和之前的transfer")
+        return original_transfer
+
+    return transfer

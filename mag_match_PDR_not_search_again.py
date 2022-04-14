@@ -1,31 +1,21 @@
 import math
-
 import mag_mapping_tools as MMT
 import numpy as np
 
-# 坐标系位移（平移）
-MOVE_X = 7.
-MOVE_Y = 8.
 # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
 MAP_SIZE_X = 8.
 MAP_SIZE_Y = 13.
 # 地图地磁块大小
 BLOCK_SIZE = 0.25
-# 内插半径
-INTER_RADIUS = 1
-# 内插迭代次数上限
-INTER_TIME_THR = 2
-# 删除多余内插块的程度，越大删除的内插范围越大，可以为负值。
-DELETE_LEVEL = 0
 # ------------------------
 # 缓冲池大小，单位（m）
-BUFFER_DIS = 3
+BUFFER_DIS = 5
 # 下采样粒度，应为块大小的整数倍？（下采样越小，匹配难度越大！）
 DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
 MAX_ITERATION = 100
 # 目标损失
-TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 35
+TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 20
 print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 STEP = 1 / 70
@@ -33,33 +23,20 @@ STEP = 1 / 70
 SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
-# 先绕原坐标原点逆时针旋转，然后再平移
-start_transfers = [
-    [7, 1.0, math.radians(-89.)], [7, 1.25, math.radians(-89.)], [7, 1.5, math.radians(-89.)],
-    [7, 1.75, math.radians(-89.)], [7, 2.0, math.radians(-89.)], [7, 2.25, math.radians(-89.)],
-    [7, 0.5, math.radians(-89.)], [7, 0.75, math.radians(-89.)], [7, 2.5, math.radians(-89.)],
-
-    [7.25, 1.0, math.radians(-89.)], [7.25, 1.25, math.radians(-89.)], [7.25, 1.5, math.radians(-89.)],
-    [7.25, 1.75, math.radians(-89.)], [7.25, 2.0, math.radians(-89.)], [7.25, 2.25, math.radians(-89.)],
-    [7.25, 0.5, math.radians(-89.)], [7.25, 0.75, math.radians(-89.)], [7.25, 2.5, math.radians(-89.)],
-
-    [7.5, 1.0, math.radians(-89.)], [7.5, 1.25, math.radians(-89.)], [7.5, 1.5, math.radians(-89.)],
-    [7.5, 1.75, math.radians(-89.)], [7.5, 2.0, math.radians(-89.)], [7.5, 2.25, math.radians(-89.)],
-    [7.5, 0.5, math.radians(-89.)], [7.5, 0.75, math.radians(-89.)], [7.5, 2.5, math.radians(-89.)],
-
-    [6.75, 1.0, math.radians(-89.)], [6.75, 1.25, math.radians(-89.)], [6.75, 1.5, math.radians(-89.)],
-    [6.75, 1.75, math.radians(-89.)], [6.75, 2.0, math.radians(-89.)], [6.75, 2.25, math.radians(-89.)],
-    [6.75, 0.5, math.radians(-89.)], [6.75, 0.75, math.radians(-89.)], [6.75, 2.5, math.radians(-89.)],
-
-]
+# Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
+ORIGINAL_START_TRANSFER = [6.7, 1.6, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["data/data_test/pdr/IMU-10-4-180.40767532222338 Pixel 6.csv.npy",
+                "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv"]
 
 
 def main():
     # 全流程
     # 1、建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
-    mag_map_mv = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mv.csv', delimiter=','))
-    mag_map_mh = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mh.csv', delimiter=','))
+    mag_map_mv = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mv_full.csv', delimiter=','))
+    mag_map_mh = np.array(np.loadtxt('data/data_test/mag_map/mag_map_mh_full.csv', delimiter=','))
     mag_map = []
     for i in range(0, len(mag_map_mv)):
         temp = []
@@ -71,10 +48,8 @@ def main():
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     # TODO 如果3.1失败则重新给出 BUFFER_DIS\DOWN_SIP_DIS\TARGET_LOSS重新开始？
-    path_pdr_raw = ["data/data_test/pdr/IMU-1-1-191.0820588816594 Pixel 3a.csv.npy",
-                    "data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"]
-    pdr_xy = np.load(path_pdr_raw[0])[:, 0:2]
-    data_all = MMT.get_data_from_csv(path_pdr_raw[1])
+    pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
+    data_all = MMT.get_data_from_csv(PATH_PDR_RAW[1])
     raw_mag = data_all[:, 21:24]
     raw_ori = data_all[:, 18:21]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
@@ -93,7 +68,7 @@ def main():
     # 那么，结束条件应该为相同的迭代次数，而非loss阈值
     # 如果越界，则保存越界前的最后一次轨迹
     candidates_loss_xy_tf = []
-    for tf in start_transfers:
+    for tf in START_TRANSFERS:
         last_loss_xy_tf_num = None
         for iter_num in range(0, MAX_ITERATION):
             out_of_map, loss, map_xy, tf = MMT.cal_new_transfer_and_last_loss_xy(
@@ -167,7 +142,7 @@ def main():
         for xy in map_xy:
             final_xy.append(xy)
     final_xy = np.array(final_xy)
-    MMT.paint_xy(final_xy, "The final xy", [0, MAP_SIZE_X*1.2, 0, MAP_SIZE_Y*1.2])
+    MMT.paint_xy(final_xy, "The final xy", [0, MAP_SIZE_X * 1., 0, MAP_SIZE_Y * 1.])
     return
 
 
