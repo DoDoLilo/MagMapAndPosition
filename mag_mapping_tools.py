@@ -307,12 +307,11 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
 
 
 # 循环调用内插填补
-# 输入:栅格化rast_mv_mh，循环次数上限time_threshold(未指定则循环直到不存在新增块),填补半径radius,块大小block_size
+# 输入:栅格化rast_mv_mh，循环次数上限time_threshold(-1则循环直到不存在新增块),填补半径radius,块大小block_size
 # 输出：内插填补的次数 num
 def inter_fill_completely(rast_mv_mh, time_thr=-1, radius=1, block_size=0.3):
     num = 0
     while True:
-        # paint_heat_map(rast_mv_mh, num)
         num += 1
         if len(interpolation_to_fill(rast_mv_mh, radius, block_size)[1]) == 0 or num == time_thr:
             break
@@ -789,5 +788,5 @@ def produce_transfer_candidates_search_again(original_transfer, area_config,
     if transfer is None:
         print("区域遍历失败，无法找到匹配轨迹！选择相信PDR和之前的transfer")
         return original_transfer
-
+    print("区域遍历成功，找到匹配轨迹！")
     return transfer

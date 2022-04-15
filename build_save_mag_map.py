@@ -11,8 +11,8 @@ MAP_SIZE_Y = 13.
 BLOCK_SIZE = 0.25
 # 内插半径
 INTER_RADIUS = 1
-# 内插迭代次数上限
-INTER_TIME_THR = 2
+# 内插迭代次数上限，目前未使用。目前方案是内插满后再根据DELETE_LEVEL进行删除
+# INTER_TIME_THR = 2
 # 删除多余内插块的程度，越大删除的内插范围越大，可以为负值。
 DELETE_LEVEL = -3
 

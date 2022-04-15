@@ -13,7 +13,7 @@ BUFFER_DIS = 5
 # 下采样粒度，应为块大小的整数倍？（下采样越小，匹配难度越大！）
 DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
-MAX_ITERATION = 100
+MAX_ITERATION = 90
 # 目标损失
 TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 20
 print("TARGET_LOSS:", TARGET_LOSS)
@@ -24,11 +24,11 @@ SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-ORIGINAL_START_TRANSFER = [6.7, 1.6, math.radians(-100.)]
-START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+ORIGINAL_START_TRANSFER = [6.7, 1.75, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
 START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
-PATH_PDR_RAW = ["data/data_test/pdr/IMU-10-4-180.40767532222338 Pixel 6.csv.npy",
-                "data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv"]
+PATH_PDR_RAW = ["data/data_test/pdr/IMU-10-5-170.2125898151382 Pixel 6.csv.npy",
+                "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv"]
 
 
 def main():
@@ -142,7 +142,9 @@ def main():
         for xy in map_xy:
             final_xy.append(xy)
     final_xy = np.array(final_xy)
-    MMT.paint_xy(final_xy, "The final xy", [0, MAP_SIZE_X * 1., 0, MAP_SIZE_Y * 1.])
+    MMT.paint_xy(final_xy, "The final xy: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3}, TargetLoss={4}"
+                 .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS),
+                 [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
     return
 
 
