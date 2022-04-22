@@ -33,6 +33,7 @@ def lowpass_butter(data_magnitude, sample_frequency, cut_off_frequency):
     return signal.filtfilt(b, a, data_magnitude)
 
 
+# cut_off: 舍弃的高频信号分量数量，该值越大，滤掉的高频信号越多
 def lowpass_emd(data_magnitude, cut_off):
     emd = EMD()
     imfs = emd(data_magnitude)
@@ -251,7 +252,7 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输出：栅格化的地磁双分量数组
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
 def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
-                       delete=False, delete_level=0):
+                       delete=False, delete_level=0, lowpass_filter_level=3):
     if len(file_paths) == 0:
         return None
     data_all = get_data_from_csv(file_paths[0])
@@ -267,8 +268,8 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     # 地磁总强度，垂直、水平分量，
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # emd滤波，太慢了，不过是建库阶段，无所谓
-    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 3)
-    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 3)
+    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
     arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
@@ -318,7 +319,8 @@ def inter_fill_completely(rast_mv_mh, time_thr=-1, radius=1, block_size=0.3):
     return num
 
 
-# 输入：内插前的栅格化数组rast_raw，内插后数组rast_inter，内插半径，块大小
+# 输入：内插前的栅格化数组rast_raw，内插后数组rast_inter，内插半径，块大小，删除程度(允许<0)
+# delete_level: =0的时候，保留内插半径圆范围内的块（所以=0的时候也可能进行删除），>0的时候删除的更多，<0的时候保留范围会扩大！
 # 输出：保留原始位置一个半径内的内插值后的数组
 # 实现：1、copy rast_raw；2、遍历rast_raw，将要保留的位置在copy中置 1；3、修改rast_inter
 def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, delete_level):
@@ -356,13 +358,13 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
-def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_filter=False):
+def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_filter=False, lowpass_filter_level=3):
     # 计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # 滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波？
     if do_filter:
-        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 2)
-        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 2)
+        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
         arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
     # for遍历data_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
     i_start = 0
@@ -635,14 +637,14 @@ def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_freq
 # 输入：+ data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, ori/mag采样频率sampling_frequency=200
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
-def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_filter=False,
+def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_filter=False, lowpass_filter_level=3,
                        pdr_frequency=20, sampling_frequency=200):
     # 1.计算mv,mh分量,得到[N][mv, mh]
     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
     # 2.滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波
     if do_filter:
-        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], 2)
-        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], 2)
+        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
         arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
 
     # + 3.相比原来的samples_buffer()：

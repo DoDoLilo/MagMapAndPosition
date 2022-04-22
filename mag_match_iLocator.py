@@ -11,6 +11,8 @@ MAP_SIZE_X = 8.
 MAP_SIZE_Y = 13.
 # 地图地磁块大小
 BLOCK_SIZE = 0.25
+# 低通滤波的程度，值越大滤波越强。整型，无单位。
+EMD_FILTER_LEVEL = 3
 # 内插半径
 INTER_RADIUS = 1
 # 内插迭代次数上限
@@ -93,7 +95,8 @@ def main():
     pdr_data_ori = pdr_data_all[:, 18:21]
     pdr_data_xy = pdr_data_all[:, np.shape(pdr_data_all)[1] - 5:np.shape(pdr_data_all)[1] - 3]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy, do_filter=True)
+    match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy,
+                                        do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL)
 
     # 3、手动给出初始transfer_0，注意单条
     # 根据匹配段进行迭代，3种迭代结束情况：

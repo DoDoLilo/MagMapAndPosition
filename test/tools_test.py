@@ -20,6 +20,8 @@ MOVE_Y = 8
 MAP_SIZE_X = 8
 MAP_SIZE_Y = 13
 BLOCK_SIZE = 0.25
+# 低通滤波的程度，值越大滤波越强。整型，无单位。
+EMD_FILTER_LEVEL = 3
 INTER_RADIUS = 1
 INTER_TIME_THR = 2
 DELETE_LEVEL = 1
@@ -33,6 +35,7 @@ path_pdr_raw = ["data/data_test/pdr/IMU-10-6-178.00767980919863 Pixel 6.csv.npy"
 pdr_xy = np.load(path_pdr_raw[0])[:, 0:2]
 data_all = MMT.get_data_from_csv(path_pdr_raw[1])
 raw_mag = data_all[:, 21:24]
+MMT.paint_signal(MMT.lowpass_emd(raw_mag[:, 0], 5))
 raw_ori = data_all[:, 18:21]
 raw_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
 PDR_xy_mag_ori = MMT.get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori)
@@ -41,7 +44,7 @@ pdr_data_ori = PDR_xy_mag_ori[:, 5:8]
 pdr_data_xy = pdr_xy
 # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
 match_seq_list = MMT.samples_buffer(BUFFER_DIS, DOWN_SIP_DIS, pdr_data_ori, pdr_data_mag, pdr_data_xy,
-                                    do_filter=True)
+                                    do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL)
 map_xy_list = []
 for i in range(0, len(match_seq_list)):
     match_seq = np.array(match_seq_list[i])

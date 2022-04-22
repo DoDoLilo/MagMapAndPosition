@@ -9,6 +9,8 @@ MAP_SIZE_X = 8.
 MAP_SIZE_Y = 13.
 # 地图地磁块大小
 BLOCK_SIZE = 0.25
+# 低通滤波的程度，值越大滤波越强。整型，无单位。
+EMD_FILTER_LEVEL = 3
 # 内插半径
 INTER_RADIUS = 1
 # 内插迭代次数上限，目前未使用。目前方案是内插满后再根据DELETE_LEVEL进行删除
@@ -32,7 +34,8 @@ mag_map = MMT.build_map_by_files(
     # time_thr=INTER_TIME_THR,
     radius=INTER_RADIUS, block_size=BLOCK_SIZE,
     delete=True,
-    delete_level=DELETE_LEVEL
+    delete_level=DELETE_LEVEL,
+    lowpass_filter_level=EMD_FILTER_LEVEL
 )
 
 # mag_map保存到 data/data_test/mag_map

@@ -7,6 +7,8 @@ MAP_SIZE_X = 8.
 MAP_SIZE_Y = 13.
 # 地图地磁块大小
 BLOCK_SIZE = 0.25
+# 低通滤波的程度，值越大滤波越强。整型，无单位。
+EMD_FILTER_LEVEL = 3
 # ------------------------
 # 缓冲池大小，单位（m）
 BUFFER_DIS = 5
@@ -53,7 +55,8 @@ def main():
     raw_mag = data_all[:, 21:24]
     raw_ori = data_all[:, 18:21]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy, do_filter=True,
+    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy,
+                                            do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL,
                                             pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
 
     # 3、手动给出初始transfer_0，注意单条
