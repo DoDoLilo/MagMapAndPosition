@@ -411,11 +411,11 @@ def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_fil
 def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
     mmv = np.mean(arr_mv_mh[i_start:i_end, 0])
     mmh = np.mean(arr_mv_mh[i_start:i_end, 1])
-    return data_xy[i_mid][0], data_xy[i_mid][1], mmv, mmh
+    return data_xy[i_mid][0], data_xy[i_mid][1], mmv, mmh, i_mid
 
 
 # 对建立的方格指纹库进行双线性插值法+偏微分
-# 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取地磁插值、梯度的坐标 x,y ，block_size:bs
+# 输入：处理完毕的地磁指纹库（栅格化、内插）mag_map_vh[x][y][mv, mh]，需要获取地磁插值、梯度的坐标 x,y ，block_size
 # 输出：np.array[线性插值后的磁强[l_mv, l_mh], 2对梯度分量[[[[mv/x , mv/y]], [[mh/x, mh/y]]]] :[2][1×2]
 # 实现：1、当前点 x,y得到4候选块下标 : [x//bs, x//bs +1] * [y//bs, y//bs +1]
 #      2、候选块下标对应原始坐标到x,y的距离: x-x0=x%bs, x1-x=bs-x%bs, x1-x0=bs; y-y0=y%bs, y1-y=bs-y%bs, y1-y0=bs
@@ -449,8 +449,53 @@ def get_linear_map_mvh_with_grad(mag_map, x, y, block_size):
         grad_py = x_x0 * (m_p11 - m_p10) / (x1_x0 * y1_y0) + x1_x * (m_p01 - m_p00) / (x1_x0 * y1_y0)
 
         return m_pxy, np.array([[[grad_px[0], grad_py[0]]], [[grad_px[1], grad_py[1]]]])
-    # 注意全流程的时候进行-1检查！过程中每个阶段出现-1该怎么处理！
+
     print("Error: Out of Whole Map!")
+    return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
+
+
+# 对get_linear_map_mvh_with_grad()的中选取插值候选块的思路进行优化，修改如下：
+# 原来的方法，不管(x, y)落于块内部的哪里，其插值计算来源都是固定的那4块，而现在选取的候选块更合理。
+# 1.对地磁块block_size * block_size 的区域再细分为 “田” 4小块；    |1 |2 |
+# 2.给出待插值点(x, y)，其必定落在这4小块中的某一块；               |3 |4 |
+# 3.若落在小块1，则候选块选取左上角的；落在2则选择右上角的... ...
+# 4.而此时候选点P00,P01,P10,P11的坐标改为 候选块的中心点
+def get_linear_map_mvh_with_grad_2(mag_map, x, y, block_size):
+    b_x = int(x // block_size)
+    b_y = int(y // block_size)
+    num_b_x = len(mag_map)
+    num_b_y = 0 if num_b_x == 0 else len(mag_map[0])
+
+    if -1 < b_x < num_b_x and -1 < b_y < num_b_y and mag_map[b_x][b_y][0] != -1 and mag_map[b_x][b_y][1] != -1:
+        # 根据x,y所处区域，获取候选块P00,P10,P01,P11的下标
+        b_x0 = b_x - 1 if x % block_size <= block_size / 2 else b_x
+        b_y0 = b_y - 1 if y % block_size <= block_size / 2 else b_y
+        b_x1 = b_x0 + 1
+        b_y1 = b_y0 + 1
+        # 根据块下标获取块中心坐标：x_center = b_x * bs + bs/2
+        half_bs = block_size / 2
+        x0 = b_x0 * block_size + half_bs
+        x1 = b_x1 * block_size + half_bs
+        y0 = b_y0 * block_size + half_bs
+        y1 = b_y1 * block_size + half_bs
+        # 计算完中心坐标后，再对块下标越界修正，此时取到的地磁值都为非-1
+        b_x0 = b_x0 if b_x0 >= 0 else b_x
+        b_y0 = b_y0 if b_y0 >= 0 else b_y
+        b_x1 = b_x1 if b_x1 < num_b_x else b_x
+        b_y1 = b_y1 if b_y1 < num_b_y else b_y
+        m_p00 = mag_map[b_x0][b_y0]
+        m_p01 = mag_map[b_x0][b_y1]
+        m_p10 = mag_map[b_x1][b_y0]
+        m_p11 = mag_map[b_x1][b_y1]
+        # 带入论文公式4.2、4.3、4.4计算地磁插值、地磁双方向梯度
+        m_pxy = (y-y0) * ((x-x0) * m_p11 + (x1-x) * m_p01) / ((x1-x0) * (y1-y0)) + \
+                (y1-y) * ((x-x0) * m_p10 + (x1-x) * m_p00) / ((x1-x0) * (y1-y0))
+        grad_px = (y-y0) * (m_p11 - m_p01) / ((x1-x0) * (y1-y0)) + (y1-y) * (m_p10 - m_p00) / ((x1-x0) * (y1-y0))
+        grad_py = (x-x0) * (m_p11 - m_p10) / ((x1-x0) * (y1-y0)) + (x1-x) * (m_p01 - m_p00) / ((x1-x0) * (y1-y0))
+
+        return m_pxy, np.array([[[grad_px[0], grad_py[0]]], [[grad_px[1], grad_py[1]]]])
+
+    print("Error in get_linear_map_mvh_with_grad_2(): Out of Whole Map or Out of Mag Map!")
     return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
 
 
@@ -541,9 +586,9 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
     map_mvh = []
     mag_map_grads = []
     for xy in map_xy:
-        mvh, grad = get_linear_map_mvh_with_grad(mag_map, xy[0], xy[1], block_size)
+        mvh, grad = get_linear_map_mvh_with_grad_2(mag_map, xy[0], xy[1], block_size)
         if mvh[0] == -1 or mvh[1] == -1:
-            print("The out point is:", xy, ", [", xy // block_size, "]")
+            # print("The out point is:", xy, ", [", xy // block_size, "]")
             out_of_map = True
             break
         map_mvh.append(mvh)
@@ -615,6 +660,13 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
 #      mean=False则使用单点地磁
 # 输出：PDR_xy_mag_ori[2+3+3=8]矩阵，[x,y, mag[0],mag[1],mag[2], ori[0],ori[1],ori[2]]
 def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_frequency=200):
+    if sampling_frequency < pdr_frequency:
+        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency < PDR_frequency")
+        return None
+    if sampling_frequency % pdr_frequency != 0:
+        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency % PDR_frequency != 0")
+        return None
+
     window_size = int(sampling_frequency / pdr_frequency)
     if window_size < 1:
         print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
@@ -635,7 +687,7 @@ def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_freq
 
 # 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作
 # 输入：+ data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, ori/mag采样频率sampling_frequency=200
-# 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
+# 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]，注意不要转成np.array，序列长度M不一样
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
 def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_filter=False, lowpass_filter_level=3,
                        pdr_frequency=20, sampling_frequency=200):
@@ -649,10 +701,14 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_
 
     # + 3.相比原来的samples_buffer()：
     #    需要将原始高频arr_mv_mh 变为和 低频data_xy(pdr_xy) 对齐、平均后的和data_xy(PDR_xy)同频的arr_mv_mh
-    window_size = int(sampling_frequency / pdr_frequency)
-    if window_size < 1:
-        print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
+    if sampling_frequency < pdr_frequency:
+        print("Wrong frequency in samples_buffer_PDR: sampling_frequency < PDR_frequency")
         return None
+    if sampling_frequency % pdr_frequency != 0:
+        print("Wrong frequency in samples_buffer_PDR: sampling_frequency % PDR_frequency != 0")
+        return None
+
+    window_size = int(sampling_frequency / pdr_frequency)
 
     arr_mv_mh_pdr = []
     for i in range(0, len(PDR_xy)):
@@ -748,7 +804,6 @@ def produce_transfer_candidates(original_transfer, config):
     return np.array(transfer_candidates)
 
 
-# TODO 小范围区域遍历函数，将mag_match_PDR.py中的3.1功能提取出来
 # 输入：用于生成transfer_candidates：初始变换向量original_transfer，范围参数area_config，
 #     用于高斯牛顿迭代的：待匹配序列match_seq，地磁地图mag_map，块大小block_size，迭代步长step，最大迭代次数max_iteration
 #     用于筛选候选项的：目标损失target_loss
