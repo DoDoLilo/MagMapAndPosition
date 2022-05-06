@@ -21,7 +21,7 @@ DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
 MAX_ITERATION = 90
 # 目标损失
-TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 20
+TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 15
 print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 STEP = 1 / 70
@@ -30,11 +30,11 @@ SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-ORIGINAL_START_TRANSFER = [6.7, 1.75, math.radians(-100.)]
-START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [2, 2, 2]]
+ORIGINAL_START_TRANSFER = [7, 1.5, math.radians(-89.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
 START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
-PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-5-170.2125898151382 Pixel 6.csv.npy",
-                "../data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv"]
+PATH_PDR_RAW =  ["../data/data_test/pdr/IMU-1-1-191.0820588816594 Pixel 3a.csv.npy",
+                 "../data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"]
 
 
 def main():
@@ -50,7 +50,7 @@ def main():
             temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
         mag_map.append(temp)
     mag_map = np.array(mag_map)
-    MMT.paint_heat_map(mag_map, show_mv=False)
+    # MMT.paint_heat_map(mag_map, show_mv=False)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
@@ -63,8 +63,7 @@ def main():
                                             do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL,
                                             pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
 
-    # 3、手动给出初始transfer_0，注意单条
-    # 根据匹配段进行迭代，3种迭代结束情况：
+    # 3、根据匹配段进行迭代，3种迭代结束情况：
     #  A：迭代out_of_map返回True；B：迭代次数超出阈值但last_loss仍未达标；C：迭代last_loss小于阈值
     # 情况AB表示匹配失败
     #   3.1第一次匹配进行起点周围区域遍历，遍历后选出残差最小的
@@ -75,13 +74,13 @@ def main():
     out_of_map, loss, map_xy, not_used_transfer = MMT.cal_new_transfer_and_last_loss_xy(
         transfer, first_match, mag_map, BLOCK_SIZE, STEP
     )
-    if loss > TARGET_LOSS:
+    if out_of_map or loss > TARGET_LOSS:
         print("初始Transfer遍历查找失败!")
         return
 
     print("The Start Track(Loss={0}, Target Loss={2},Transfer={1}):"
           .format(loss, [transfer[0], transfer[1], math.degrees(transfer[2])], TARGET_LOSS))
-
+    start_transfer = transfer.copy()
     #    3.2后续轨迹基于初始匹配进行迭代------------------------------------------------------------------------------------------
     map_xy_list = [map_xy]
     for i in range(1, len(match_seq_list)):
@@ -113,7 +112,7 @@ def main():
                 transfer = MMT.produce_transfer_candidates_search_again(last_transfer, START_CONFIG,
                                                                         match_seq, mag_map,
                                                                         BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                                        TARGET_LOSS)
+                                                                        TARGET_LOSS, break_advanced=True)
                 # 如果区域遍历寻找失败，transfer = last_transfer
                 map_xy_list.append(MMT.transfer_axis_list(match_seq[:, 0:2], transfer))
                 break
@@ -125,28 +124,50 @@ def main():
                 map_xy_list.append(map_xy)
                 break
 
-    # -----------4 输出结果参数------------------------------------------------------------------------------------------
+    # -----------4 计算结果参数------------------------------------------------------------------------------------------
+    # 4.1 设置之后的numpy数组中print的数字格式为保留小数后3位
     np.set_printoptions(precision=3, suppress=True)
+    # 4.2 将计算的分段mag xy合并还原为一整段 final_xy
     final_xy = []
     final_index = []
     for map_xy in map_xy_list:
         for xy in map_xy:
             final_xy.append(xy)
+    final_xy = np.array(final_xy)
+    # 4.3 还原每个xy对应的原PDR中的下标index
     for match_seq in match_seq_list:
         for p in match_seq:
             final_index.append(p[4])
-    final_xy = np.array(final_xy)
+    # 4.4 将final_xy与final_index合并为MagPDR_xy（合并前要先在final_index的列上增加维度，让其由1维变为N×1的二维数组）
     final_index = np.array(final_index)
     final_index = final_index[:, np.newaxis]
     MagPDR_xy = np.concatenate((final_xy, final_index), axis=1)
+    # 4.5 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
-    MMT.paint_xy(iLocator_xy, "The ground truth by iLocator", [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
-    MMT.paint_xy(final_xy, "The final xy: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
+    # 4.6 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
+    pdr_xy = MMT.transfer_axis_list(pdr_xy, start_transfer)
+    # 4.7 计算PDR xy与Ground Truth(iLocator)之间的单点距离
+    distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
+        iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+    # 4.8 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
+    distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
+        iLocator_xy, MagPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+
+    # -----------5 输出结果参数------------------------------------------------------------------------------------------
+    # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
+    # print("distance_of_PDR_iLocator_points:\n", distance_of_PDR_iLocator_points)
+    mean_distance = np.mean(distance_of_PDR_iLocator_points[:, 0])
+    print("Mean Distance between PDR and GT:  ", mean_distance)
+    # 5.2 打印MagPDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
+    # print("distance_of_MagPDR_iLocator_points:\n", distance_of_MagPDR_iLocator_points)
+    mean_distance = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
+    print("Mean Distance between MagPDR and GT:  ", mean_distance)
+    # 5.3 对Ground Truth(iLocator)、PDR、MagPDR进行绘图
+    MMT.paint_xy(iLocator_xy, "The Ground Truth by iLocator", [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
+    MMT.paint_xy(pdr_xy, "The PDR", [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
+    MMT.paint_xy(final_xy, "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
                  .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS),
                  [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
-    distance_and_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(iLocator_xy, MagPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
-    print(distance_and_PDR_iLocator_points)
-    print("Mean Distance:", np.mean(distance_and_PDR_iLocator_points[:, 0]))
     return
 
 

@@ -29,6 +29,7 @@ DELETE_LEVEL = 1
 BUFFER_DIS = 5
 DOWN_SIP_DIS = BLOCK_SIZE
 
+
 path_pdr_raw = ["../data/data_test/pdr/IMU-10-6-178.00767980919863 Pixel 6.csv.npy",
                 "../data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"]
 
@@ -56,13 +57,10 @@ for map_xy in map_xy_list:
 final_xy = np.array(final_xy)
 # MMT.paint_xy(pdr_xy)
 # MMT.paint_xy(final_xy)
-new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.9, 2.2, math.radians(-100.)]))
+new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, [6.8, 2.4, math.radians(-100.)]))
 MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
 MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
 MMT.paint_xy(raw_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
 print("First Points, PDR:\n{0}, \niLocator:\n{1}".format(new_pdr_xy[0:5], raw_xy[0:5]))
 
-arr = np.array([[1, 2], [3, 4], [5, 6]])
-arr2 = np.array([7, 8, 9])
-arr2 = arr2[:, np.newaxis]
-print(np.concatenate((arr, arr2), axis=1))
+

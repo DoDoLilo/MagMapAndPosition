@@ -488,14 +488,16 @@ def get_linear_map_mvh_with_grad_2(mag_map, x, y, block_size):
         m_p10 = mag_map[b_x1][b_y0]
         m_p11 = mag_map[b_x1][b_y1]
         # 带入论文公式4.2、4.3、4.4计算地磁插值、地磁双方向梯度
-        m_pxy = (y-y0) * ((x-x0) * m_p11 + (x1-x) * m_p01) / ((x1-x0) * (y1-y0)) + \
-                (y1-y) * ((x-x0) * m_p10 + (x1-x) * m_p00) / ((x1-x0) * (y1-y0))
-        grad_px = (y-y0) * (m_p11 - m_p01) / ((x1-x0) * (y1-y0)) + (y1-y) * (m_p10 - m_p00) / ((x1-x0) * (y1-y0))
-        grad_py = (x-x0) * (m_p11 - m_p10) / ((x1-x0) * (y1-y0)) + (x1-x) * (m_p01 - m_p00) / ((x1-x0) * (y1-y0))
+        m_pxy = (y - y0) * ((x - x0) * m_p11 + (x1 - x) * m_p01) / ((x1 - x0) * (y1 - y0)) + \
+                (y1 - y) * ((x - x0) * m_p10 + (x1 - x) * m_p00) / ((x1 - x0) * (y1 - y0))
+        grad_px = (y - y0) * (m_p11 - m_p01) / ((x1 - x0) * (y1 - y0)) + (y1 - y) * (m_p10 - m_p00) / (
+                (x1 - x0) * (y1 - y0))
+        grad_py = (x - x0) * (m_p11 - m_p10) / ((x1 - x0) * (y1 - y0)) + (x1 - x) * (m_p01 - m_p00) / (
+                (x1 - x0) * (y1 - y0))
 
         return m_pxy, np.array([[[grad_px[0], grad_py[0]]], [[grad_px[1], grad_py[1]]]])
 
-    print("Error in get_linear_map_mvh_with_grad_2(): Out of Whole Map or Out of Mag Map!")
+    # print("Out of Mag Map!")
     return np.array([-1, -1]), np.array([[[-1, -1]], [[-1, -1]]])
 
 
@@ -526,7 +528,7 @@ def transfer_axis_list(pdr_xy, transfer):
     for xy in pdr_xy:
         x, y, grad = transfer_axis_with_grad(transfer, xy[0], xy[1])
         map_xy.append([x, y])
-    return map_xy
+    return np.array(map_xy)
 
 
 # 计算残差平方和，论文公式4.8 TODO:为什么不用平均残差？
@@ -537,6 +539,19 @@ def cal_loss(mag_arr_1, mag_arr_2):
     s = 0
     for m1, m2 in zip(mag_arr_1, mag_arr_2):
         s += (m1[0] - m2[0]) ** 2 + (m1[1] - m2[1]) ** 2
+    return s
+
+
+# 对cal_loss()的优化：
+# 将地磁序列减去其均值后再计算残差，认为 相同形状、不同模值 的俩序列的匹配度应该更高(loss更小)。
+def cal_loss_2(mag_arr_1, mag_arr_2):
+    s = 0
+    mv_arr_1 = remove_mean(mag_arr_1[:, 0])
+    mh_arr_1 = remove_mean(mag_arr_1[:, 1])
+    mv_arr_2 = remove_mean(mag_arr_2[:, 0])
+    mh_arr_2 = remove_mean(mag_arr_2[:, 1])
+    for mv_1, mh_1, mv_2, mh_2 in zip(mv_arr_1, mh_arr_1, mv_arr_2, mh_arr_2):
+        s += (mv_1 - mv_2) ** 2 + (mh_1 - mh_2) ** 2
     return s
 
 
@@ -581,7 +596,8 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
     xy_grads = np.array(xy_grads)
 
     # 2、由map_xy到mag_map中获取 map_mvh[M][mv, mh], mag_map_grads[M][2][[1×2]]
-    # 若获取到了-1，怎么办？表示到了地图外面，此种迭代方向错误-->提前结束迭代，抛出Exception
+    # 若获取到了-1，怎么办？表示到了地图外面，此种迭代方向错误-->提前结束迭代
+    # NOTE: 此时map_mvh可能为空
     out_of_map = False
     map_mvh = []
     mag_map_grads = []
@@ -597,7 +613,7 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
     mag_map_grads = np.array(mag_map_grads)
 
     # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
-    loss = cal_loss(pdr_mvh, map_mvh)
+    loss = cal_loss_2(pdr_mvh, map_mvh) if not out_of_map else None
 
     # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step计算 _transfer
     new_transfer = transfer
@@ -769,6 +785,7 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_
 
 # 候选transfer向量生成器：
 # 输入一个向量，输出以该向量为中心，产生的一组用以小区域遍历的候选项。
+# 输出的候选向量应该按由近到远的辐射顺序
 # 可自定义参数: transfer各维度分别的增减粒度、增减次数
 # 输入：初始向量original_transfer[△x, △y(米), △angle(弧度)]，
 #       自定义参数config[2][3]=[[x,y(米),angle(弧度)增减粒度],[x,y,angle增减次数]]
@@ -796,10 +813,30 @@ def produce_transfer_candidates(original_transfer, config):
         angle_candidates.append(original_transfer[2] - ta * config[0][2])
 
     # 三重for循环将这些候选分量重组
-    for x in x_candidates:
-        for y in y_candidates:
-            for angle in angle_candidates:
-                transfer_candidates.append([x, y, angle])
+    # for x in x_candidates:
+    #     for y in y_candidates:
+    #         for angle in angle_candidates:
+    #             transfer_candidates.append([x, y, angle])
+
+    # 将这些候选分量按变换距离升序重新排列组和。x,y,z_candidates内部已按升序
+    # 所以，以(i_x + i_y + i_angle)作为新组合的下标，
+    temp_list = []
+    len_x = len(x_candidates)
+    len_y = len(y_candidates)
+    len_angle = len(angle_candidates)
+
+    for i_t in range(0, len_x + len_y + len_angle):
+        temp_list.append([])
+
+    for i_x in range(0, len_x):
+        for i_y in range(0, len_y):
+            for i_angle in range(0, len_angle):
+                temp_list[i_x + i_y + i_angle].append([x_candidates[i_x], y_candidates[i_y], angle_candidates[i_angle]])
+
+    # 将temp_list中的范围升序结果提取到transfer_candidates中。NOTE：len(temp_list[i])不全相等！
+    for temp in temp_list:
+        for t in temp:
+            transfer_candidates.append(t)
 
     return np.array(transfer_candidates)
 
@@ -809,9 +846,10 @@ def produce_transfer_candidates(original_transfer, config):
 #     用于筛选候选项的：目标损失target_loss
 # 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
 # NOTE：注意 地址拷贝（浅拷贝） 和 值拷贝（深拷贝） 的问题。
+# 如果遍历候选项的过程中找到了符合target_loss的，则提前返回结果
 def produce_transfer_candidates_search_again(original_transfer, area_config,
                                              match_seq, mag_map, block_size, step, max_iteration,
-                                             target_loss):
+                                             target_loss, break_advanced=False):
     # 1.生成小范围的所有transfer_candidates
     transfer_candidates = produce_transfer_candidates(original_transfer, area_config)
 
@@ -824,6 +862,9 @@ def produce_transfer_candidates_search_again(original_transfer, area_config,
                 transfer, match_seq, mag_map, block_size, step
             )
             if not out_of_map:
+                if break_advanced and loss <= target_loss:
+                    print("break advanced in the search!")
+                    return transfer
                 last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
             else:
                 break
@@ -847,3 +888,8 @@ def produce_transfer_candidates_search_again(original_transfer, area_config,
         return original_transfer
     print("区域遍历成功，找到匹配轨迹！")
     return transfer
+
+
+# 均值移除
+def remove_mean(magSerial):
+    return magSerial - np.mean(magSerial)

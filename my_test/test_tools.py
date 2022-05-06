@@ -18,7 +18,7 @@ def get_time_in_second():
 # 计算iLocator xy和PDR xy的距离，用来判断PDR轨迹是否准确
 # 还是需要这个函数的，就算PDR里有ATE/RTE，那也还需要一个和cal_distance_between_iLocator_and_MagPDR对比的相同类型的误差指标
 # iLocator xy和PDR xy之间下标是均匀稀疏的
-# 输入：iLocator xy，PDR xy，iLocator频率，PDR频率
+# 输入：iLocator xy，坐标系变换后的PDR xy，iLocator频率，PDR频率
 # 返回：distance_and_PDR_iLocator_points[N][5]：保存距离和坐标
 # 外层计算平均距离，则使用 np.mean(arr[:, 0], axis=0)即可。
 def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, iLocator_frequency, PDR_frequency):
