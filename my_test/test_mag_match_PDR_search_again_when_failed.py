@@ -58,7 +58,7 @@ def main():
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
     raw_mag = data_all[:, 21:24]
     raw_ori = data_all[:, 18:21]
-    # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh, PDRindex]
+    # match_seq_list=[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
     match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy,
                                             do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL,
                                             pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
@@ -81,8 +81,10 @@ def main():
     print("The Start Track(Loss={0}, Target Loss={2},Transfer={1}):"
           .format(loss, [transfer[0], transfer[1], math.degrees(transfer[2])], TARGET_LOSS))
     start_transfer = transfer.copy()
+
     #    3.2后续轨迹基于初始匹配进行迭代------------------------------------------------------------------------------------------
     map_xy_list = [map_xy]
+
     for i in range(1, len(match_seq_list)):
         match_seq = np.array(match_seq_list[i])
         print("\nMatch Seq:{0}   --------------------------".format(i))

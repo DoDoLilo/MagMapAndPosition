@@ -531,7 +531,7 @@ def transfer_axis_list(pdr_xy, transfer):
     return np.array(map_xy)
 
 
-# 计算残差平方和，论文公式4.8 TODO:为什么不用平均残差？
+# 计算残差平方和，论文公式4.8
 # 输入：重采样的：PDR实时地磁序列M1[M][mv, mh]，Mag_Map地磁序列M2[M][mv, mh]
 # 输出：残差平方和 S
 # 实现：欧氏距离
@@ -609,6 +609,7 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
             break
         map_mvh.append(mvh)
         mag_map_grads.append(grad)
+
     map_mvh = np.array(map_mvh)
     mag_map_grads = np.array(mag_map_grads)
 
@@ -661,7 +662,7 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
     return
 
 
-# ----------------PDR相关--------------------------------
+# ----------------PDR相关--------------------------------------------------------------------------------------------
 # PDR window size = 200，simple frequency=200Hz/s，sliding window size=10
 # 而PDR模型输出为该窗口的平均速度v，认为该1秒的窗口速度相同，每 10/200s = 0.05s输出一速度
 # 得到的PDR_x,y是该速度v*0.05s，而我们的PDR程序第一个200窗口乘的是0.05s而不是1.0s
@@ -893,3 +894,74 @@ def produce_transfer_candidates_search_again(original_transfer, area_config,
 # 均值移除
 def remove_mean(magSerial):
     return magSerial - np.mean(magSerial)
+
+
+# -----------计算磁场特征的函数--------------------------------------------------------------------------------------
+# 地磁序列标准差D：该值越高，表示特征越丰富
+# 输入：磁场序列mag_arr[N][mv, mh] （地磁指纹库磁场序列 or 实测磁场序列）
+# 输出：标准差std_deviation_mv, std_deviation_mh
+# 算法：1.先计算各分量均值；2.标准差= math.sqrt(1/N * sum(mag_i - mag_mean)**2)
+def cal_std_deviation_mag_vh(mag_vh_arr):
+    mv_mean = np.mean(mag_vh_arr[:, 0])
+    mh_mean = np.mean(mag_vh_arr[:, 1])
+    n = len(mag_vh_arr)
+    sum_mv_dis = 0
+    sum_mh_dis = 0
+    for mv_mh in mag_vh_arr:
+        sum_mv_dis += (mv_mh[0] - mv_mean) ** 2
+        sum_mh_dis += (mv_mh[1] - mh_mean) ** 2
+
+    std_deviation_mv = math.sqrt(1 / n * sum_mv_dis)
+    std_deviation_mh = math.sqrt(1 / n * sum_mh_dis)
+    return std_deviation_mv, std_deviation_mh
+
+
+# 地磁序列相邻点相关系数（总和）：相关系数越大，相邻点越接近，特征越低，所以返回其倒数表示不相关程度。
+# 输入：磁场序列mag_arr[N][mv, mh] （地磁指纹库磁场序列 or 实测磁场序列）
+# 输出：不相关程度 unsameness = 1/相关系数
+# 算法：1.分别计算两个分量的所需值；2.相关系数R = ...
+def cal_unsameness_mag_vh(mag_vh_arr):
+    std_deviation_mv, std_deviation_mh = cal_std_deviation_mag_vh(mag_vh_arr)
+    n = len(mag_vh_arr)
+    mv_mean = np.mean(mag_vh_arr[:, 0])
+    mh_mean = np.mean(mag_vh_arr[:, 1])
+    k_mv = 1 / ((n - 1) * std_deviation_mv ** 2)
+    k_mh = 1 / ((n - 1) * std_deviation_mh ** 2)
+    sum_temp_mv = 0
+    sum_temp_mh = 0
+
+    for i in range(1, n):
+        sum_temp_mv += (mag_vh_arr[i][0] - mv_mean) * (mag_vh_arr[i - 1][0] - mv_mean)
+        sum_temp_mh += (mag_vh_arr[i][1] - mh_mean) * (mag_vh_arr[i - 1][1] - mh_mean)
+
+    sameness_mv = k_mv * sum_temp_mv
+    sameness_mh = k_mh * sum_temp_mh
+    return 1 / sameness_mv, 1 / sameness_mh
+
+
+# 地磁梯度水平：和标准差类似，越高则特征越丰富
+# 输入: mag_map_grads[N][2][1][2] = [N][[[grad_mv_x, grad_mv_y]], [[grad_mh_x, grad_mh_y]]]
+# 输出：4分量梯度水平
+# NOTE：1.该函数的输入仅使用地磁指纹库中来源的双分量、双方向梯度，无法计算实测低维地磁序列双方向梯度。
+#       与loss结合：loss小代表实测序列与指纹库序列相似，所以此时库梯度也能一定程度代表实测梯度水平。
+#      2.如何获取该数组中的值：grad_mv_x = mag_map_grads[i][0][0][0]
+# 算法：对单个分量，grad_level = math.sqrt(1/N * sum(grad_i**2))
+def cal_grads_level_mag_vh(mag_map_grads):
+    n = len(mag_map_grads)
+    sum_grad_mv_x = 0
+    sum_grad_mv_y = 0
+    sum_grad_mh_x = 0
+    sum_grad_mh_y = 0
+
+    for grad_all in mag_map_grads:
+        sum_grad_mv_x += grad_all[0][0][0] ** 2
+        sum_grad_mv_y += grad_all[0][0][1] ** 2
+        sum_grad_mh_x += grad_all[1][0][0] ** 2
+        sum_grad_mh_y += grad_all[1][0][1] ** 2
+
+    grad_level_mv_x = math.sqrt(1 / n * sum_grad_mv_x)
+    grad_level_mv_y = math.sqrt(1 / n * sum_grad_mv_y)
+    grad_level_mh_x = math.sqrt(1 / n * sum_grad_mh_x)
+    grad_level_mh_y = math.sqrt(1 / n * sum_grad_mh_y)
+
+    return grad_level_mv_x, grad_level_mv_y, grad_level_mh_x, grad_level_mh_y
