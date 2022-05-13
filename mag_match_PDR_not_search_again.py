@@ -28,7 +28,7 @@ PDR_XY_FREQUENCY = 20
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 ORIGINAL_START_TRANSFER = [6.7, 1.75, math.radians(-100.)]
 START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
-START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+START_TRANSFERS = MMT.produce_transfer_candidates_ascending(ORIGINAL_START_TRANSFER, START_CONFIG)
 PATH_PDR_RAW = ["data/data_test/pdr/IMU-10-5-170.2125898151382 Pixel 6.csv.npy",
                 "data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv"]
 

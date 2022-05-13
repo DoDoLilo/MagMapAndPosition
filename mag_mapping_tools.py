@@ -617,7 +617,7 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_s
     loss = cal_loss_2(pdr_mvh, map_mvh) if not out_of_map else None
 
     # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step计算 _transfer
-    new_transfer = transfer
+    new_transfer = transfer.copy()
     #    4.1 计算 H 及其 逆
     matrix_H = np.zeros([3, 3], dtype=float)
     for mag_map_grad, xy_grad in zip(mag_map_grads, xy_grads):
@@ -791,7 +791,7 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_
 # 输入：初始向量original_transfer[△x, △y(米), △angle(弧度)]，
 #       自定义参数config[2][3]=[[x,y(米),angle(弧度)增减粒度],[x,y,angle增减次数]]
 # 输出：满足要求的候选transfer_candidates[m][3] （包括original_transfer）
-def produce_transfer_candidates(original_transfer, config):
+def produce_transfer_candidates_ascending(original_transfer, config):
     transfer_candidates = []
     # transfer_candidates.append(original_transfer)
     x_candidates = []
@@ -848,11 +848,11 @@ def produce_transfer_candidates(original_transfer, config):
 # 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
 # NOTE：注意 地址拷贝（浅拷贝） 和 值拷贝（深拷贝） 的问题。
 # 如果遍历候选项的过程中找到了符合target_loss的，则提前返回结果
-def produce_transfer_candidates_search_again(original_transfer, area_config,
+def produce_transfer_candidates_search_again(start_transfer, area_config,
                                              match_seq, mag_map, block_size, step, max_iteration,
-                                             target_loss, break_advanced=False):
-    # 1.生成小范围的所有transfer_candidates
-    transfer_candidates = produce_transfer_candidates(original_transfer, area_config)
+                                             target_loss, break_advanced=True):
+    # 1.生成小范围的所有transfer_candidates（且范围由近到远）
+    transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
 
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
     candidates_loss_xy_tf = []
@@ -863,31 +863,35 @@ def produce_transfer_candidates_search_again(original_transfer, area_config,
                 transfer, match_seq, mag_map, block_size, step
             )
             if not out_of_map:
-                if break_advanced and loss <= target_loss:
-                    print("break advanced in the search!")
-                    return transfer
-                last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+                if loss <= target_loss:
+                    last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+                    if break_advanced:
+                        print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
+                        return transfer
             else:
                 break
 
         if last_loss_xy_tf_num is not None:
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
+    # 如果选择了提前结束，但是到了这一步，表示寻找失败
+    if break_advanced:
+        print("\t\t.search Failed, use last transfer.")
+        return start_transfer
+
     # 3.选出候选集中Loss最小的项，返回其transfer；
     #     若无候选项，则表示小范围寻找失败，返回original_transfer
     transfer = None
     min_loss = None
-    print("candidates loss:")
     for c in candidates_loss_xy_tf:
-        print(c[0])
-        if c[0] < target_loss:
-            if min_loss is None or c[0] < min_loss:
-                min_loss = c[0]
-                transfer = c[2]
+        if min_loss is None or c[0] < min_loss:
+            min_loss = c[0]
+            transfer = c[2]
 
     if transfer is None:
-        print("区域遍历失败，无法找到匹配轨迹！选择相信PDR和之前的transfer")
-        return original_transfer
-    print("区域遍历成功，找到匹配轨迹！")
+        print("\t\t.search Failed, use last transfer.")
+        return start_transfer
+
+    print("\t\t.search Succeed, final loss = ", min_loss)
     return transfer
 
 
@@ -913,7 +917,8 @@ def cal_std_deviation_mag_vh(mag_vh_arr):
 
     std_deviation_mv = math.sqrt(1 / n * sum_mv_dis)
     std_deviation_mh = math.sqrt(1 / n * sum_mh_dis)
-    return std_deviation_mv, std_deviation_mh
+    std_deviation_all = math.sqrt(std_deviation_mv ** 2 + std_deviation_mh ** 2)
+    return std_deviation_mv, std_deviation_mh, std_deviation_all
 
 
 # 地磁序列相邻点相关系数（总和）：相关系数越大，相邻点越接近，特征越低，所以返回其倒数表示不相关程度。
@@ -921,7 +926,7 @@ def cal_std_deviation_mag_vh(mag_vh_arr):
 # 输出：不相关程度 unsameness = 1/相关系数
 # 算法：1.分别计算两个分量的所需值；2.相关系数R = ...
 def cal_unsameness_mag_vh(mag_vh_arr):
-    std_deviation_mv, std_deviation_mh = cal_std_deviation_mag_vh(mag_vh_arr)
+    std_deviation_mv, std_deviation_mh, not_used_ret = cal_std_deviation_mag_vh(mag_vh_arr)
     n = len(mag_vh_arr)
     mv_mean = np.mean(mag_vh_arr[:, 0])
     mh_mean = np.mean(mag_vh_arr[:, 1])
@@ -936,7 +941,10 @@ def cal_unsameness_mag_vh(mag_vh_arr):
 
     sameness_mv = k_mv * sum_temp_mv
     sameness_mh = k_mh * sum_temp_mh
-    return 1 / sameness_mv, 1 / sameness_mh
+    unsameness_mv = 1 / sameness_mv
+    unsameness_mh = 1 / sameness_mh
+    unsameness_all = math.sqrt(unsameness_mv ** 2 + unsameness_mh ** 2)
+    return unsameness_mv, unsameness_mh, unsameness_all
 
 
 # 地磁梯度水平：和标准差类似，越高则特征越丰富
