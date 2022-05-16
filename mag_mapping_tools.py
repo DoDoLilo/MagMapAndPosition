@@ -906,6 +906,8 @@ def remove_mean(magSerial):
 # 输出：标准差std_deviation_mv, std_deviation_mh
 # 算法：1.先计算各分量均值；2.标准差= math.sqrt(1/N * sum(mag_i - mag_mean)**2)
 def cal_std_deviation_mag_vh(mag_vh_arr):
+    mag_vh_arr = np.array(mag_vh_arr)
+
     mv_mean = np.mean(mag_vh_arr[:, 0])
     mh_mean = np.mean(mag_vh_arr[:, 1])
     n = len(mag_vh_arr)
@@ -926,6 +928,8 @@ def cal_std_deviation_mag_vh(mag_vh_arr):
 # 输出：不相关程度 unsameness = 1/相关系数
 # 算法：1.分别计算两个分量的所需值；2.相关系数R = ...
 def cal_unsameness_mag_vh(mag_vh_arr):
+    mag_vh_arr = np.array(mag_vh_arr)
+
     std_deviation_mv, std_deviation_mh, not_used_ret = cal_std_deviation_mag_vh(mag_vh_arr)
     n = len(mag_vh_arr)
     mv_mean = np.mean(mag_vh_arr[:, 0])
@@ -955,6 +959,8 @@ def cal_unsameness_mag_vh(mag_vh_arr):
 #      2.如何获取该数组中的值：grad_mv_x = mag_map_grads[i][0][0][0]
 # 算法：对单个分量，grad_level = math.sqrt(1/N * sum(grad_i**2))
 def cal_grads_level_mag_vh(mag_map_grads):
+    mag_map_grads = np.array(mag_map_grads)
+
     n = len(mag_map_grads)
     sum_grad_mv_x = 0
     sum_grad_mv_y = 0
@@ -972,4 +978,13 @@ def cal_grads_level_mag_vh(mag_map_grads):
     grad_level_mh_x = math.sqrt(1 / n * sum_grad_mh_x)
     grad_level_mh_y = math.sqrt(1 / n * sum_grad_mh_y)
 
-    return grad_level_mv_x, grad_level_mv_y, grad_level_mh_x, grad_level_mh_y
+    grad_level_mv = math.sqrt(grad_level_mv_x ** 2 + grad_level_mv_y ** 2)
+    grad_level_mh = math.sqrt(grad_level_mh_x ** 2 + grad_level_mh_y ** 2)
+    grad_level_all = math.sqrt(grad_level_mv ** 2 + grad_level_mh ** 2)
+
+    return grad_level_mv, grad_level_mh, grad_level_all
+
+
+# TODO 根据特征计算判断是否要使用当前transfer.
+def trusted_mag_features():
+    return True

@@ -68,7 +68,7 @@ def main():
     # 情况AB表示匹配失败
     #   3.1第一次匹配进行起点周围区域遍历，遍历后选出残差最小的
     first_match = np.array(match_seq_list[0])
-    print("*Match Seq 0 : \n\tfirst deep search seq.")
+    print("*Match Seq 0 : first deep search seq.")
     transfer = MMT.produce_transfer_candidates_search_again(ORIGINAL_START_TRANSFER, START_CONFIG,
                                                             first_match, mag_map, BLOCK_SIZE, STEP, MAX_ITERATION,
                                                             TARGET_LOSS, break_advanced=False)
@@ -79,7 +79,7 @@ def main():
         print("\t初始Transfer遍历查找失败!")
         return
 
-    print("\tThe Start Track(Loss={0}, Target Loss={2},Transfer={1}):"
+    print("\tThe Start Track(Loss={0:.8}, Target Loss={2},Transfer={1}):"
           .format(loss, [transfer[0], transfer[1], math.degrees(transfer[2])], TARGET_LOSS))
     start_transfer = transfer.copy()
 
@@ -87,52 +87,83 @@ def main():
     map_xy_list = [map_xy]
 
     for i in range(1, len(match_seq_list)):
+        print("\nMatch Seq {0} :".format(i))
         # 获取实测待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
         match_seq = np.array(match_seq_list[i])
         iter_num = 0
         loss_list = []
         start_transfer = transfer.copy()  # NOTE: Use copy() if just pointer copy caused unexpect data changed
-
-        # 计算实测序列中的地磁序列的特征程度
-        mag_vh_arr = match_seq[:, 2:4]
-        std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
-        unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
-
-        print("\nMatch Seq {0} :".format(i))
-        print("\t.real time mag features: Standard Deviation mv, mh, all: {0:.4}, {1:.4} = {2:.4} | "
-              "Unsameness mv, mh, all:{3:.4}, {4:.4} = {5:.4}"
-              .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
-                      unsameness_mv, unsameness_mh, unsameness_all))
-        print("\t.start_transfer:", [transfer[0], transfer[1], math.degrees(transfer[2])])
-
+        print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]".format(transfer[0], transfer[1], math.degrees(transfer[2])))
+        # 核心循环搜索代码
         while True:
             iter_num += 1
+            # 单次高斯牛顿迭代
             out_of_map, loss, map_xy, transfer = MMT.cal_new_transfer_and_last_loss_xy(
                 transfer, match_seq, mag_map, BLOCK_SIZE, STEP
             )
+
+            # 如果没出界
             if not out_of_map:
                 loss_list.append(loss)
+                if loss <= TARGET_LOSS:
+                    print("\tSucceed in iteration", iter_num)
+                    # 成功了怎么办：提前结束迭代，先不添加该结果，等待后续特征判断
+                    break
 
+            # 如果出界或者超出迭代次数仍未找到目标
             if out_of_map or iter_num > MAX_ITERATION:
-                print("\tFailed in iteration", iter_num, ", loss list:", loss_list)
-                # 失败了怎么办？
-                # 1.在迭代前备份的start_transfer基础上进行范围搜索，范围从近到远，匹配成功则提前结束。
-                print("\tSearch more in the start_transfer ... ...")
+                # 失败了怎么办：
+                # 在迭代前备份的start_transfer基础上进行范围搜索，范围从近到远，匹配成功则提前结束。
+                print("\tFailed in iteration", iter_num, ", loss list:", loss_list,
+                      "\n\tSearch more in the start_transfer ... ...")
                 transfer = MMT.produce_transfer_candidates_search_again(start_transfer, START_CONFIG,
                                                                         match_seq, mag_map,
                                                                         BLOCK_SIZE, STEP, MAX_ITERATION,
                                                                         TARGET_LOSS, break_advanced=True)
-                # 2.若仍失败，则相信PDR和last_transfer，接着输出结果
-                # NOTE:失败了还要还原之前的transfer，因为迭代过程中transfer一直在变化！
-                map_xy_list.append(MMT.transfer_axis_list(match_seq[:, 0:2], transfer))
                 break
 
-            if loss <= TARGET_LOSS:
-                print("\tSucceed in iteration", iter_num, ", transfer changed to: ",
-                      [transfer[0], transfer[1], math.degrees(transfer[2])])
-                # 成功了怎么办？加到结果中，提前结束迭代
-                map_xy_list.append(map_xy)
-                break
+        if not np.array_equal(transfer, start_transfer):
+            print("\tFound new transfer:[{0:.5}, {1:.5}, {2:.5}°]"
+                  .format(transfer[0], transfer[1], math.degrees(transfer[2])))
+
+            # 找到了新的符合loss要求的transfer，但还要根据新的transfer计算指纹库磁场特征-----------------------------------
+            temp_map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
+            mag_map_mvh = []
+            mag_map_grads = []
+            for xy in temp_map_xy:
+                map_mvh, grad = MMT.get_linear_map_mvh_with_grad_2(mag_map, xy[0], xy[1], BLOCK_SIZE)
+                # 此时xy取到的grad必为有效值，不需要判断
+                mag_map_mvh.append(map_mvh)
+                mag_map_grads.append(grad)
+
+            std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_map_mvh)  # 标准差
+            unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_map_mvh)  # 相邻不相关程度
+            grad_level_mv, grad_level_mh, grad_level_all = MMT.cal_grads_level_mag_vh(mag_map_grads)  # 整体梯度水平
+            print("\tFeatures of map mag:"
+                  "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
+                  "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
+                  "\n\t\t.grad level mv, mh, all: {6:.4}, {7:.4} = {8:.4}"
+                  .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
+                          unsameness_mv, unsameness_mh, unsameness_all,
+                          grad_level_mv, grad_level_mh, grad_level_all))
+            # 现在根据全部已有特征判断当前transfer要不要使用。如果判断不使用，则回退transfer
+            if not MMT.trusted_mag_features():
+                transfer = start_transfer
+
+        # 计算实测序列中的地磁序列的特征程度，并打印输出结果
+        mag_vh_arr = match_seq[:, 2:4]
+        std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
+        unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
+        print("\tFeatures of real time mag: "
+              "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
+              "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
+              .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
+                      unsameness_mv, unsameness_mh, unsameness_all))
+        # 特征输出完毕，这些print后续可以去掉-----------------------------------------------------------------------------
+
+        map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
+        map_xy_list.append(map_xy)
+        # TODO 计算该段map_xy和真值iLocator_xy的误差距离，并打印输出
 
     # -----------4 计算结果参数------------------------------------------------------------------------------------------
     print("\n\n====================MagPDR End =============================================")
