@@ -51,8 +51,8 @@ def down_sampling_by_mean(data, factor):
 
 
 # 对输入的一维数组进行绘制查看波形
-def paint_signal(data_signal, title='signal', ylim=60):
-    plt.figure(figsize=(15, 5))
+def paint_signal(data_signal, title='data', ylim=60):
+    plt.figure(figsize=(3, 7))
     x = range(0, len(data_signal))
     plt.title(label=title, loc='center')
     plt.ylim(0, ylim)
@@ -875,7 +875,7 @@ def produce_transfer_candidates_search_again(start_transfer, area_config,
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
     if break_advanced:
-        print("\t\t.search Failed, use last transfer.")
+        print("\t\t.*Failed again, use last transfer.")
         return start_transfer
 
     # 3.选出候选集中Loss最小的项，返回其transfer；
@@ -985,6 +985,6 @@ def cal_grads_level_mag_vh(mag_map_grads):
     return grad_level_mv, grad_level_mh, grad_level_all
 
 
-# TODO 根据特征计算判断是否要使用当前transfer.
+# TODO 根据特征计算判断是否要使用当前transfer
 def trusted_mag_features():
     return True

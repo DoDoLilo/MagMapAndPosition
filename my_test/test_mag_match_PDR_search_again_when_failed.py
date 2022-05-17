@@ -56,6 +56,8 @@ def main():
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
     data_all = MMT.get_data_from_csv(PATH_PDR_RAW[1])
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
+    # 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
+    MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
     raw_mag = data_all[:, 21:24]
     raw_ori = data_all[:, 18:21]
     # match_seq_list=[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
@@ -81,10 +83,11 @@ def main():
 
     print("\tThe Start Track(Loss={0:.8}, Target Loss={2},Transfer={1}):"
           .format(loss, [transfer[0], transfer[1], math.degrees(transfer[2])], TARGET_LOSS))
-    start_transfer = transfer.copy()
+    first_seq_transfer = transfer.copy()
 
-    #    3.2后续轨迹基于初始匹配进行迭代------------------------------------------------------------------------------------------
+    #    3.2后续轨迹基于初始匹配进行迭代------------------------------------------------
     map_xy_list = [map_xy]
+    # TODO 收集评估参数，并绘制折线图？如何绘制，查找什么之间的关系？
 
     for i in range(1, len(match_seq_list)):
         print("\nMatch Seq {0} :".format(i))
@@ -123,10 +126,9 @@ def main():
                 break
 
         if not np.array_equal(transfer, start_transfer):
+            # 找到了新的符合loss要求的transfer，但还要根据新的transfer计算指纹库磁场特征
             print("\tFound new transfer:[{0:.5}, {1:.5}, {2:.5}°]"
                   .format(transfer[0], transfer[1], math.degrees(transfer[2])))
-
-            # 找到了新的符合loss要求的transfer，但还要根据新的transfer计算指纹库磁场特征-----------------------------------
             temp_map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
             mag_map_mvh = []
             mag_map_grads = []
@@ -135,7 +137,9 @@ def main():
                 # 此时xy取到的grad必为有效值，不需要判断
                 mag_map_mvh.append(map_mvh)
                 mag_map_grads.append(grad)
-
+            mag_map_mvh = np.array(mag_map_mvh)
+            MMT.paint_signal(mag_map_mvh[:, 0], "Map mv Seq {0}".format(i))
+            MMT.paint_signal(mag_map_mvh[:, 1], "Map mh Seq {0}".format(i))
             std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_map_mvh)  # 标准差
             unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_map_mvh)  # 相邻不相关程度
             grad_level_mv, grad_level_mh, grad_level_all = MMT.cal_grads_level_mag_vh(mag_map_grads)  # 整体梯度水平
@@ -152,6 +156,8 @@ def main():
 
         # 计算实测序列中的地磁序列的特征程度，并打印输出结果
         mag_vh_arr = match_seq[:, 2:4]
+        MMT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
+        MMT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
         std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
         unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
         print("\tFeatures of real time mag: "
@@ -160,10 +166,30 @@ def main():
               .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
                       unsameness_mv, unsameness_mh, unsameness_all))
         # 特征输出完毕，这些print后续可以去掉-----------------------------------------------------------------------------
-
+        # 计算该段MagPDR轨迹序列map_xy，并添加到结果集中
         map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
         map_xy_list.append(map_xy)
-        # TODO 计算该段map_xy和真值iLocator_xy的误差距离，并打印输出
+        # 计算该段raw_xy（仅初始对齐的PDR轨迹）\map_xy和真值iLocator_xy的误差距离，并打印输出
+        index_list = []
+        for p in match_seq:
+            index_list.append(p[4])
+        index_list = np.array(index_list)
+        index_list = index_list[:, np.newaxis]
+        # 轨迹与pdr原始下标合并
+        map_xy_with_index = np.concatenate((map_xy, index_list), axis=1)
+        raw_xy = MMT.transfer_axis_list(match_seq[:, 0:2], first_seq_transfer)
+        raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
+        # 计算轨迹距离
+        distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
+            iLocator_xy, map_xy_with_index, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+        distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
+            iLocator_xy, raw_xy_with_index, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+        mean_distance_between_MagPDR_GT = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
+        mean_distance_between_PDR_GT = np.mean(distance_of_PDR_iLocator_points[:, 0])
+        improvement = mean_distance_between_PDR_GT - mean_distance_between_MagPDR_GT
+        print("\tMean Distance between PDR and GT: %.3f" % mean_distance_between_PDR_GT)
+        print("\tMean Distance between MagPDR and GT: %.3f" % mean_distance_between_MagPDR_GT)
+        print("\tImprovement: %.3f" % improvement)
 
     # -----------4 计算结果参数------------------------------------------------------------------------------------------
     print("\n\n====================MagPDR End =============================================")
@@ -182,17 +208,15 @@ def main():
     # 4.3 将final_xy与final_index合并为MagPDR_xy（合并前要先在final_index的列上增加维度，让其由1维变为N×1的二维数组）
     final_index = np.array(final_index)
     final_index = final_index[:, np.newaxis]
-    MagPDR_xy = np.concatenate((final_xy, final_index), axis=1)
-    # 4.4 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
-    MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
-    # 4.5 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
-    pdr_xy = MMT.transfer_axis_list(pdr_xy, start_transfer)
-    # 4.6 计算PDR xy与Ground Truth(iLocator)之间的单点距离
+    magPDR_xy = np.concatenate((final_xy, final_index), axis=1)
+    # 4.4 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
+    pdr_xy = MMT.transfer_axis_list(pdr_xy, first_seq_transfer)
+    # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
         iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
-    # 4.7 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
+    # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-        iLocator_xy, MagPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+        iLocator_xy, magPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
