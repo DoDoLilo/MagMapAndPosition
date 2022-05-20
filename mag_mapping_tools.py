@@ -290,19 +290,31 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
 # 输入：[x][y][mv, mh]
 def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
     if show_mv:
-        plt.figure(figsize=(19, 10))
+        plt.figure(figsize=(10, 36))
         plt.title('mag_vertical_' + str(num))
-        sns.set(font_scale=0.8)
-        sns.heatmap(arr_mv_mh[:, :, 0], cmap='YlOrRd', annot=True, fmt='.0f')
-        # sns.heatmap(arr_mv_mh[:, :, 0], cmap='rainbow')
+        # sns.set(font_scale=0.8)
+        # cmap='YlOrRd'
+        sns.heatmap(
+            data=arr_mv_mh[:, :, 0],
+            cmap='jet',
+            # annot=True, fmt='.0f',
+            mask=arr_mv_mh[:, :, 0] == -1,
+            cbar=True, vmax=65, vmin=-1
+        )
         plt.show()
 
     if show_mh:
-        plt.figure(figsize=(19, 10))
+        plt.figure(figsize=(10, 36))
         plt.title('mag_horizontal_' + str(num))
-        sns.set(font_scale=0.8)
-        sns.heatmap(arr_mv_mh[:, :, 1], cmap='YlOrRd', annot=True, fmt='.0f')
-        # sns.heatmap(arr_mv_mh[:, :, 1], cmap='rainbow')
+        # sns.set(font_scale=0.8)
+        # cmap='YlOrRd'
+        sns.heatmap(
+            data=arr_mv_mh[:, :, 1],
+            cmap='jet',
+            # annot=True, fmt='.0f',
+            mask=arr_mv_mh[:, :, 1] == -1,
+            cbar=True, vmax=65, vmin=-1
+        )
         plt.show()
     return
 

@@ -33,8 +33,8 @@ PDR_XY_FREQUENCY = 20
 ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-98.)]
 START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
 START_TRANSFERS = MMT.produce_transfer_candidates_ascending(ORIGINAL_START_TRANSFER, START_CONFIG)
-PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy",
-                "../data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
+PATH_PDR_RAW = ["../data/data_test/data_to_position_pdr/data_server_room/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy"
+                "../data/data_test/data_to_building_map/server_room/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
 
 
 def main():
@@ -175,7 +175,7 @@ def main():
             index_list.append(p[4])
         index_list = np.array(index_list)
         index_list = index_list[:, np.newaxis]
-        # 轨迹与pdr原始下标合并
+        # 轨迹与pdr原始下标合并`
         map_xy_with_index = np.concatenate((map_xy, index_list), axis=1)
         raw_xy = MMT.transfer_axis_list(match_seq[:, 0:2], first_seq_transfer)
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)

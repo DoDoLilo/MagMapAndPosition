@@ -88,7 +88,7 @@ def main():
     # file_to_match = "data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"
     # file_to_match = "data/data_test/data_server_room/IMU-1-2-191.47707604211791 Pixel 3a_sync.csv"
     # file_to_match = "data/data_test/data_server_room/IMU-2-1-193.76517575369385 Pixel 6_sync_Error.csv"
-    file_to_match = "data/data_test/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"
+    file_to_match = "data/data_test/data_to_position_pdr/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"
     # file_to_match = "data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"
     pdr_data_all = MMT.get_data_from_csv(file_to_match)
     pdr_data_mag = pdr_data_all[:, 21:24]
