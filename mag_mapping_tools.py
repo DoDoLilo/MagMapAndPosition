@@ -5,6 +5,7 @@ from PyEMD import EMD
 from dtaidistance import dtw
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.spatial.transform import Rotation
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
@@ -62,48 +63,48 @@ def paint_signal(data_signal, title='data', ylim=60):
     return
 
 
-# 获得向量v在向量g的法平面上的投影
-# g一般为重力（需要取反），v为磁力
-# def get_shadow(g, v):
-#     v2 = [g[1] * v[2] - g[2] * v[1], g[2] * v[0] - g[0] * v[2], g[0] * v[1] - g[1] * v[0]]
-#     ag = [v2[1] * g[2] - v2[2] * g[1], v2[2] * g[0] - v2[0] * g[2], v2[0] * g[1] - v2[1] * g[0]]
-#     length_ag = math.sqrt(ag[0] * ag[0] + ag[1] * ag[1] + ag[2] * ag[2])
-#     ans = [ag[0] / length_ag, ag[1] / length_ag, ag[2] / length_ag]
-#     return ans
-
-
 def cal_length(x):
     return math.sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2])
 
 
-# 根据投影到重力水平面的方法计算水平分量，再计算垂直分量
-# def get_mag_hv_1(g, mag):
-#     s = get_shadow(g, mag)
-#     mh = cal_length(s)
-#     mv = math.sqrt(mag[0] * mag[0] + mag[1] * mag[1] + mag[2] * mag[2] - mh * mh)
-#     return mv, mh
+# TODO:去掉这个abs()，把所有-1赋值、判断，替换为np.nan赋值、判断。np.array中不能存None，要将np.array设置为float后存np.nan
+# 增加使用ori或 game_rotation 计算得到的欧拉角：区别，用ori需要转为弧度，欧拉角不需要
+# 用论文方法和angles[方位角azimuth，俯仰角pitch，横滚角roll]计算mv,mh
+def get_mag_vh(angles, mag, use_orientation):
+    pitch = angles[1]
+    roll = angles[2]
+    if use_orientation:
+        pitch = math.radians(pitch)
+        roll = math.radians(roll)
 
-
-# 用论文方法和ori计算mv,mh
-def get_mag_vh_2(ori, mag):
-    pitch = math.radians(ori[1])
-    roll = math.radians(ori[2])
+    # 需要保证pitch roll是弧度radians
     mv = abs(
-        -math.sin(pitch) * mag[0] + math.sin(roll) * math.cos(pitch) * mag[1] + math.cos(roll) * math.cos(pitch) * mag[
-            2])
+        -math.sin(pitch) * mag[0] +
+        math.sin(roll) * math.cos(pitch) * mag[1] +
+        math.cos(roll) * math.cos(pitch) * mag[2]
+    )
     mh = math.sqrt(mag[0] ** 2 + mag[1] ** 2 + mag[2] ** 2 - mv ** 2)
     return mv, mh
 
 
-# 输入：orientation[3], mag[3]
-def get_mag_vh_arr(arr_ori, arr_mag):
+# 输入：orientation[N][3], mag[N][3]
+def get_mag_vh_arr(angles_arr, mag_arr, use_orientation):
     list_mv_mh = []
-    for i in range(0, len(arr_ori)):
-        list_mv_mh.append(get_mag_vh_2(arr_ori[i], arr_mag[i]))
+    for i in range(0, len(angles_arr)):
+        list_mv_mh.append(get_mag_vh(angles_arr[i], mag_arr[i], use_orientation))
     return np.array(list_mv_mh)
 
 
-# 用论文方法和ori替代方案计算mv,mh？
+# q为四元数
+# 输入为序列，直接并行处理，不再是一个一个处理
+# 返回垂直磁强、水平磁强和总磁强
+def get_2d_mag_qiu(q, mag):
+    ori_R = Rotation.from_quat(q)
+    glob_mag = np.einsum("tip,tp->ti", ori_R.as_matrix(), mag)
+    mag_v = np.abs(glob_mag[:, 2:3])
+    mag_h = np.linalg.norm(glob_mag[:, 0:2], axis=1, keepdims=True)
+    mag_total = np.linalg.norm(glob_mag, axis=1, keepdims=True)
+    return np.concatenate([mag_v, mag_h, mag_total], axis=1)
 
 
 # 内插填补
@@ -247,26 +248,42 @@ def change_axis(arr_x_y_gt, move_x, move_y):
     return
 
 
-# 手动挑出ilocator图片质量好的csv文件进行建库
+# 手动挑出ilocator图片质量好的csv文件进行建库·
 # 输入：原始csv文件路径file_paths
-# 输出：栅格化的地磁双分量数组
+# 输出：栅格化的地磁双分量数组 TODO: 增加磁强总量
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
-def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_thr=-1, radius=1, block_size=0.3,
-                       delete=False, delete_level=0, lowpass_filter_level=3):
+def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y,
+                       time_thr=-1,
+                       radius=1,
+                       block_size=0.3,
+                       delete_extra_blocks=False, delete_level=0,
+                       lowpass_filter_level=3,
+                       use_orientation=False):
     if len(file_paths) == 0:
         return None
+
     data_all = get_data_from_csv(file_paths[0])
     data_mag = data_all[:, 21:24]
-    data_ori = data_all[:, 18:21]
+    # data_ori = data_all[:, 18:21]  # ORIENTATION 安卓自带的姿态角虚拟传感器
+    data_quat = data_all[:, 7:11]  # GAME_ROTATION_VECTOR 未经磁场矫正的旋转向量（四元数）
     data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
 
     for i in range(1, len(file_paths)):
         data_all = get_data_from_csv(file_paths[i])
         data_mag = np.vstack((data_mag, data_all[:, 21:24]))
-        data_ori = np.vstack((data_ori, data_all[:, 18:21]))
+        # data_ori = np.vstack((data_ori, data_all[:, 18:21]))
+        data_quat = np.vstack((data_quat, data_all[:, 7:11]))
         data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
-    # 地磁总强度，垂直、水平分量，
-    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+
+    # q_R = Rotation.from_quat(data_quat)
+    # q_euler_angles = q_R.as_euler('zxy')  # 通过GAME_ROTATION_VECTOR推出的手机姿态角
+    #  计算地磁总强度，垂直、水平分量
+    # if use_orientation:
+    #     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag, use_orientation=True)
+    # else:
+    #     arr_mv_mh = get_mag_vh_arr(q_euler_angles, data_mag, use_orientation=False)
+
+    arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
     # emd滤波，太慢了，不过是建库阶段，无所谓
     mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
     mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
@@ -276,11 +293,11 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y, time_
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
     # 内插填补，绘制结果
     paint_heat_map(rast_mv_mh)
-    rast_mv_mh_raw = rast_mv_mh.copy()
+    rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
     inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
     # paint_heat_map(rast_mv_mh, fill_num)
-    if delete:
-        delete_far_blocks(rast_mv_mh_raw, rast_mv_mh, radius, block_size, delete_level)
+    if delete_extra_blocks:
+        delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
     paint_heat_map(rast_mv_mh)
     return rast_mv_mh
 
@@ -366,13 +383,17 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # 采样缓冲池_非实时（也使用累积距离）包括稀疏采样处理
 # 实现：1、计算mv,mh; 2、计算PDR累计距离
 # 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
-# 正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
+#   正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
 #  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
-def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy, do_filter=False, lowpass_filter_level=3):
+# def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy,
+#                    do_filter=False, lowpass_filter_level=3, use_orientation=True):
+#     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag, use_orientation)
+def samples_buffer(buffer_dis, down_sip_dis, data_quat, data_mag, data_xy,
+                   do_filter=False, lowpass_filter_level=3):
     # 计算mv,mh分量,得到[N][mv, mh]
-    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+    arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
     # 滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波？
     if do_filter:
         mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
@@ -576,7 +597,8 @@ def cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inve
     m0 = np.dot(mag_map_grad[0], xy_grad)
     m1 = np.dot(mag_map_grad[1], xy_grad)
     _transfer = np.dot(matrix_H_inverse,
-                       np.dot(m0.transpose(), mag_P[0] - mag_M[0]) + np.dot(m1.transpose(), mag_P[1] - mag_M[1]))
+                       np.dot(m0.transpose(), mag_P[0] - mag_M[0]) +
+                       np.dot(m1.transpose(), mag_P[1] - mag_M[1]))
     return _transfer.transpose()[0]
 
 
@@ -715,13 +737,26 @@ def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_freq
 
 
 # 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作
-# 输入：+ data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, ori/mag采样频率sampling_frequency=200
+# 输入：buffer_dis: 缓冲池的距离, down_sip_dis: 下采样距离, data_angles: 手机姿态角集合, data_mag: 磁力向量集合,
+#     + data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, angles/mag采样频率sampling_frequency=200
+#     + use_orientation:是否使用orientation传感器获取的姿态角
 # 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]，注意不要转成np.array，序列长度M不一样
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
-def samples_buffer_PDR(buffer_dis, down_sip_dis, data_ori, data_mag, PDR_xy, do_filter=False, lowpass_filter_level=3,
-                       pdr_frequency=20, sampling_frequency=200):
+# def samples_buffer_PDR(buffer_dis, down_sip_dis, data_angles, data_mag, PDR_xy,
+#                        do_filter=False,
+#                        lowpass_filter_level=3,
+#                        pdr_frequency=20,
+#                        sampling_frequency=200,
+#                        use_orientation=False):
+# 1.计算mv,mh分量,得到[N][mv, mh]
+# arr_mv_mh = get_mag_vh_arr(data_angles, data_mag, use_orientation)
+def samples_buffer_PDR(buffer_dis, down_sip_dis, data_quat, data_mag, PDR_xy,
+                       do_filter=False,
+                       lowpass_filter_level=3,
+                       pdr_frequency=20,
+                       sampling_frequency=200):
     # 1.计算mv,mh分量,得到[N][mv, mh]
-    arr_mv_mh = get_mag_vh_arr(data_ori, data_mag)
+    arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
     # 2.滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波
     if do_filter:
         mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
@@ -946,8 +981,8 @@ def cal_unsameness_mag_vh(mag_vh_arr):
     n = len(mag_vh_arr)
     mv_mean = np.mean(mag_vh_arr[:, 0])
     mh_mean = np.mean(mag_vh_arr[:, 1])
-    k_mv = 1 / ((n - 1) * std_deviation_mv ** 2)
-    k_mh = 1 / ((n - 1) * std_deviation_mh ** 2)
+    k_mv = 1 / ((n - 1) * (std_deviation_mv ** 2))
+    k_mh = 1 / ((n - 1) * (std_deviation_mh ** 2))
     sum_temp_mv = 0
     sum_temp_mh = 0
 

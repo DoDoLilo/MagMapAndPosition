@@ -2,6 +2,7 @@ import math
 import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
+from scipy.spatial.transform import Rotation
 
 # iLocator真值坐标平移参数
 MOVE_X = 7
@@ -28,21 +29,24 @@ STEP = 1 / 70
 # 原始数据采样频率 , PDR坐标输出频率
 SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
+# 是否使用orientation传感器获取手机姿态角
+USE_ORIENTATION = False
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-98.)]
 START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
 START_TRANSFERS = MMT.produce_transfer_candidates_ascending(ORIGINAL_START_TRANSFER, START_CONFIG)
-PATH_PDR_RAW = ["../data/data_test/data_to_position_pdr/data_server_room/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy"
-                "../data/data_test/data_to_building_map/server_room/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/data_server_room/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy",
+    "../data/data_test/data_to_building_map/server_room/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
 
 
 def main():
     # 全流程
-    # 1、建库
+    # 1.png、建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
-    mag_map_mv = np.array(np.loadtxt('../data/data_test/mag_map/mag_map_mv.csv', delimiter=','))
-    mag_map_mh = np.array(np.loadtxt('../data/data_test/mag_map/mag_map_mh.csv', delimiter=','))
+    mag_map_mv = np.array(np.loadtxt('../data/data_test/mag_map/server_room/mag_map_mv.csv', delimiter=','))
+    mag_map_mh = np.array(np.loadtxt('../data/data_test/mag_map/server_room/mag_map_mh.csv', delimiter=','))
     mag_map = []
     for i in range(0, len(mag_map_mv)):
         temp = []
@@ -58,12 +62,20 @@ def main():
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
     # 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
-    raw_mag = data_all[:, 21:24]
-    raw_ori = data_all[:, 18:21]
-    # match_seq_list=[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
-    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy,
-                                            do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL,
-                                            pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
+    data_mag = data_all[:, 21:24]
+    # data_ori = data_all[:, 18:21]
+    data_quat = data_all[:, 7:11]
+    # q_R = Rotation.from_quat(data_quat)
+    # q_euler_angles = q_R.as_euler('zxy')
+    # data_angles = data_ori if USE_ORIENTATION else q_euler_angles
+    # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
+    match_seq_list = MMT.samples_buffer_PDR(
+        BUFFER_DIS, DOWN_SIP_DIS, data_quat, data_mag, pdr_xy,
+        do_filter=True,
+        lowpass_filter_level=EMD_FILTER_LEVEL,
+        pdr_frequency=PDR_XY_FREQUENCY,
+        sampling_frequency=SAMPLE_FREQUENCY,
+    )
 
     # 3、根据匹配段进行迭代，3种迭代结束情况：
     #  A：迭代out_of_map返回True；B：迭代次数超出阈值但last_loss仍未达标；C：迭代last_loss小于阈值
@@ -194,7 +206,7 @@ def main():
     # -----------4 计算结果参数------------------------------------------------------------------------------------------
     print("\n\n====================MagPDR End =============================================")
     print("Calculate and show the Evaluation results:")
-    # 4.1 将计算的分段mag xy合并还原为一整段 final_xy
+    # 4.1.png 将计算的分段mag xy合并还原为一整段 final_xy
     final_xy = []
     final_index = []
     for map_xy in map_xy_list:
@@ -219,7 +231,7 @@ def main():
         iLocator_xy, magPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
-    # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
+    # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
     # print("distance_of_PDR_iLocator_points:\n", distance_of_PDR_iLocator_points)
     mean_distance = np.mean(distance_of_PDR_iLocator_points[:, 0])
     print("\tMean Distance between PDR and GT: ", mean_distance)

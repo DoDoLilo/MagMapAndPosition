@@ -39,7 +39,7 @@ PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-5-170.2125898151382 Pixel 6.csv.np
 
 def main():
     # 全流程
-    # 1、建库
+    # 1.png、建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
     mag_map_mv = np.array(np.loadtxt('../data/data_test/mag_map/mag_map_mv.csv', delimiter=','))
     mag_map_mh = np.array(np.loadtxt('../data/data_test/mag_map/mag_map_mh.csv', delimiter=','))
@@ -53,14 +53,14 @@ def main():
     # MMT.paint_heat_map(mag_map, show_mv=False)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
-    # TODO 如果3.1失败则重新给出 BUFFER_DIS\DOWN_SIP_DIS\TARGET_LOSS重新开始？
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
     data_all = MMT.get_data_from_csv(PATH_PDR_RAW[1])
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
-    raw_mag = data_all[:, 21:24]
-    raw_ori = data_all[:, 18:21]
+    data_mag = data_all[:, 21:24]
+    data_ori = data_all[:, 18:21]
+    data_quat = data_all[:, 7:11]
     # 并不在此时修改pdr_xy坐标，match_seq_list=多条匹配序列[?][?][x,y, mv, mh]
-    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, raw_ori, raw_mag, pdr_xy,
+    match_seq_list = MMT.samples_buffer_PDR(BUFFER_DIS, DOWN_SIP_DIS, data_quat, data_mag, pdr_xy,
                                             do_filter=True, lowpass_filter_level=EMD_FILTER_LEVEL,
                                             pdr_frequency=PDR_XY_FREQUENCY, sampling_frequency=SAMPLE_FREQUENCY)
 
@@ -147,7 +147,7 @@ def main():
         print("Loss list:", loss_list)
 
     # -----------4 计算结果参数------------------------------------------------------------------------------------------
-    # 4.1 设置之后的numpy数组中print的数字格式为保留小数后3位
+    # 4.1.png 设置之后的numpy数组中print的数字格式为保留小数后3位
     np.set_printoptions(precision=3, suppress=True)
     # 4.2 将计算的分段mag xy合并还原为一整段 final_xy
     final_xy = []
@@ -176,7 +176,7 @@ def main():
         iLocator_xy, MagPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
-    # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
+    # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
     print("distance_of_PDR_iLocator_points:\n", distance_of_PDR_iLocator_points)
     mean_distance = np.mean(distance_of_PDR_iLocator_points[:, 0])
     print("Mean Distance between PDR and GT:", mean_distance)
