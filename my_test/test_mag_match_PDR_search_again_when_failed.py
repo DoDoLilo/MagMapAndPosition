@@ -2,14 +2,15 @@ import math
 import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
-from scipy.spatial.transform import Rotation
+
+# from scipy.spatial.transform import Rotation
 
 # iLocator真值坐标平移参数
-MOVE_X = 7
-MOVE_Y = 8
+MOVE_X = 25.
+MOVE_Y = 12.
 # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
-MAP_SIZE_X = 8.
-MAP_SIZE_Y = 13.
+MAP_SIZE_X = 58.
+MAP_SIZE_Y = 16.
 # 地图地磁块大小
 BLOCK_SIZE = 0.25
 # 低通滤波的程度，值越大滤波越强。整型，无单位。
@@ -22,31 +23,40 @@ DOWN_SIP_DIS = BLOCK_SIZE
 # 高斯牛顿最大迭代次数
 MAX_ITERATION = 90
 # 目标损失
-TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 15
+TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10
 print("TARGET_LOSS:", TARGET_LOSS, '\n')
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-STEP = 1 / 70
+STEP = 1 / 50
 # 原始数据采样频率 , PDR坐标输出频率
 SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
 # 是否使用orientation传感器获取手机姿态角
 USE_ORIENTATION = False
+# 枚举transfers的产生参数，[0] = [△x, △y(米), △angle(弧度)] , [1] = [正负个数]
+TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)], [10, 10, 10]]
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-98.)]
-START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
-START_TRANSFERS = MMT.produce_transfer_candidates_ascending(ORIGINAL_START_TRANSFER, START_CONFIG)
+ORIGINAL_START_TRANSFER = [0, 0, math.radians(0.)]
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/data_server_room/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy",
-    "../data/data_test/data_to_building_map/server_room/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+
+print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
+# 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
+PATH_MAG_MAP = [
+    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mv_qiu_2d.csv",
+    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mh_qiu_2d.csv"
+]
+# ----------------------------
+paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
 
 
 def main():
     # 全流程
     # 1.png、建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
-    mag_map_mv = np.array(np.loadtxt('../data/data_test/mag_map/server_room/mag_map_mv.csv', delimiter=','))
-    mag_map_mh = np.array(np.loadtxt('../data/data_test/mag_map/server_room/mag_map_mh.csv', delimiter=','))
+    mag_map_mv = np.array(np.loadtxt(PATH_MAG_MAP[0], delimiter=','))
+    mag_map_mh = np.array(np.loadtxt(PATH_MAG_MAP[1], delimiter=','))
     mag_map = []
     for i in range(0, len(mag_map_mv)):
         temp = []
@@ -54,7 +64,7 @@ def main():
             temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
         mag_map.append(temp)
     mag_map = np.array(mag_map)
-    # MMT.paint_heat_map(mag_map, show_mv=False)
+    # MMT.paint_heat_map(mag_map)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
@@ -62,6 +72,8 @@ def main():
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
     # 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
+    MMT.change_axis(pdr_xy, MOVE_X, MOVE_Y)
+    MMT.paint_xy(np.vstack((pdr_xy, iLocator_xy)), None, paint_map_size)
     data_mag = data_all[:, 21:24]
     # data_ori = data_all[:, 18:21]
     data_quat = data_all[:, 7:11]
@@ -82,10 +94,10 @@ def main():
     # 情况AB表示匹配失败
     #   3.1第一次匹配进行起点周围区域遍历，遍历后选出残差最小的
     first_match = np.array(match_seq_list[0])
-    print("*Match Seq 0 : first deep search seq.")
-    transfer = MMT.produce_transfer_candidates_search_again(ORIGINAL_START_TRANSFER, START_CONFIG,
+    print("*Match Seq 0 : first search seq, deep ? or not?")
+    transfer = MMT.produce_transfer_candidates_search_again(ORIGINAL_START_TRANSFER, TRANSFERS_PRODUCE_CONFIG,
                                                             first_match, mag_map, BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                            TARGET_LOSS, break_advanced=False)
+                                                            TARGET_LOSS, break_advanced=True)
     out_of_map, loss, map_xy, not_used_transfer = MMT.cal_new_transfer_and_last_loss_xy(
         transfer, first_match, mag_map, BLOCK_SIZE, STEP
     )
@@ -121,7 +133,7 @@ def main():
             if not out_of_map:
                 loss_list.append(loss)
                 if loss <= TARGET_LOSS:
-                    print("\tSucceed in iteration", iter_num)
+                    print("\tSucceed in iteration", iter_num, ", loss list:", loss_list)
                     # 成功了怎么办：提前结束迭代，先不添加该结果，等待后续特征判断
                     break
 
@@ -131,7 +143,7 @@ def main():
                 # 在迭代前备份的start_transfer基础上进行范围搜索，范围从近到远，匹配成功则提前结束。
                 print("\tFailed in iteration", iter_num, ", loss list:", loss_list,
                       "\n\tSearch more in the start_transfer ... ...")
-                transfer = MMT.produce_transfer_candidates_search_again(start_transfer, START_CONFIG,
+                transfer = MMT.produce_transfer_candidates_search_again(start_transfer, TRANSFERS_PRODUCE_CONFIG,
                                                                         match_seq, mag_map,
                                                                         BLOCK_SIZE, STEP, MAX_ITERATION,
                                                                         TARGET_LOSS, break_advanced=True)
@@ -150,8 +162,8 @@ def main():
                 mag_map_mvh.append(map_mvh)
                 mag_map_grads.append(grad)
             mag_map_mvh = np.array(mag_map_mvh)
-            MMT.paint_signal(mag_map_mvh[:, 0], "Map mv Seq {0}".format(i))
-            MMT.paint_signal(mag_map_mvh[:, 1], "Map mh Seq {0}".format(i))
+            # MMT.paint_signal(mag_map_mvh[:, 0], "Map mv Seq {0}".format(i))
+            # MMT.paint_signal(mag_map_mvh[:, 1], "Map mh Seq {0}".format(i))
             std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_map_mvh)  # 标准差
             unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_map_mvh)  # 相邻不相关程度
             grad_level_mv, grad_level_mh, grad_level_all = MMT.cal_grads_level_mag_vh(mag_map_grads)  # 整体梯度水平
@@ -168,8 +180,8 @@ def main():
 
         # 计算实测序列中的地磁序列的特征程度，并打印输出结果
         mag_vh_arr = match_seq[:, 2:4]
-        MMT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
-        MMT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
+        # MMT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
+        # MMT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
         std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
         unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
         print("\tFeatures of real time mag: "
@@ -240,11 +252,15 @@ def main():
     mean_distance = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
     print("\tMean Distance between MagPDR and GT: ", mean_distance)
     # 5.3 对Ground Truth(iLocator)、PDR、MagPDR进行绘图
-    MMT.paint_xy(iLocator_xy, "The Ground Truth by iLocator", [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
-    MMT.paint_xy(pdr_xy, "The PDR", [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
+    MMT.paint_xy(iLocator_xy, "The Ground Truth by iLocator", paint_map_size)
+    MMT.paint_xy(pdr_xy, "The PDR", paint_map_size)
     MMT.paint_xy(final_xy, "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
                  .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS),
-                 [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
+                 paint_map_size)
+    contrast_xy = np.vstack((iLocator_xy, np.vstack((pdr_xy, final_xy))))
+    MMT.paint_xy(contrast_xy, "Three contrast xy", paint_map_size)
+    # paint_single_heat_map(mag_map, [gt, pos, cali_positions], ['line', 'line', 'line'], ['真实轨迹','PDR轨迹','EKF融合轨迹'],['black', 'purple', 'red'])
+
     return
 
 

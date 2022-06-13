@@ -6,6 +6,7 @@ from dtaidistance import dtw
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.spatial.transform import Rotation
+import matplotlib.lines as mlines
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
@@ -95,15 +96,15 @@ def get_mag_vh_arr(angles_arr, mag_arr, use_orientation):
     return np.array(list_mv_mh)
 
 
-# q为四元数
+# q为四元数（game rotation vector)
 # 输入为序列，直接并行处理，不再是一个一个处理
 # 返回垂直磁强、水平磁强和总磁强
 def get_2d_mag_qiu(q, mag):
     ori_R = Rotation.from_quat(q)
     glob_mag = np.einsum("tip,tp->ti", ori_R.as_matrix(), mag)
-    mag_v = np.abs(glob_mag[:, 2:3])
-    mag_h = np.linalg.norm(glob_mag[:, 0:2], axis=1, keepdims=True)
-    mag_total = np.linalg.norm(glob_mag, axis=1, keepdims=True)
+    mag_v = np.abs(glob_mag[:, 2:3])  # 垂直分量 = z轴结果
+    mag_h = np.linalg.norm(glob_mag[:, 0:2], axis=1, keepdims=True)  # 水平分量 = x, y的合
+    mag_total = np.linalg.norm(glob_mag, axis=1, keepdims=True)  # 总量 = x,y,z的合
     return np.concatenate([mag_v, mag_h, mag_total], axis=1)
 
 
@@ -734,6 +735,32 @@ def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_freq
                                raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
                                raw_ori[raw_i][0], raw_ori[raw_i][1], raw_ori[raw_i][2]])
     return np.array(PDR_xy_mag_ori)
+
+
+def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampling_frequency=200):
+    if sampling_frequency < pdr_frequency:
+        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency < PDR_frequency")
+        return None
+    if sampling_frequency % pdr_frequency != 0:
+        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency % PDR_frequency != 0")
+        return None
+
+    window_size = int(sampling_frequency / pdr_frequency)
+    if window_size < 1:
+        print("get_PDR_xy_align_mag_quat(): Wrong PDR\simpling frequency!")
+        return None
+
+    PDR_xy_mag_quat = []
+    for i in range(0, len(pdr_xy)):
+        raw_i = i * window_size
+        # 越界则提前跳出循环，按理说正确的[pdr_frequency, simpling_frequency]不会有这种情况
+        if raw_i >= len(raw_mag):
+            print("get_PDR_xy_mag_ori(): Drop out in break!")
+            break
+        PDR_xy_mag_quat.append([pdr_xy[i][0], pdr_xy[i][1],
+                                raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
+                                raw_quat[raw_i][0], raw_quat[raw_i][1], raw_quat[raw_i][2], raw_quat[raw_i][3]])
+    return np.array(PDR_xy_mag_quat)
 
 
 # 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作

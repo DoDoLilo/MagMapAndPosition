@@ -21,11 +21,11 @@ DELETE_LEVEL = -3
 USE_ORIENTATION = False
 
 file_paths_build_map = [
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-1-4.247409484433081 Pixel 3a_sync.csv"
+    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-1-4.247409484433081 Pixel 3a_sync.csv",
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-3-182.20603680993108 Pixel 3a_sync.csv"
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-523-4-16.85575427716903 Pixel 3a_sync.csv",
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-523-5-174.51484401105918 Pixel 3a_sync.csv"
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-6-180.96802404173124 Pixel 3a_sync.csv",
+    "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-6-180.96802404173124 Pixel 3a_sync.csv",
     "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-7-184.01945203456944 Pixel 3a_sync.csv"
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-8-182.21094088575512 Pixel 3a_sync.csv"
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-9-8.673526599631316 Pixel 3a_sync.csv"
@@ -44,7 +44,7 @@ mag_map = MMT.build_map_by_files(
 
 # mag_map保存到 data/data_test/mag_map
 # mag_map[i][j][mv][mh]
-save_path = 'data/data_test/mag_map/one_floor_hall_hallway/map_F7_B30_full'
+save_path = 'data/data_test/mag_map/one_floor_hall_hallway/map_F6_7_B30_full'
 np.savetxt(save_path + '/mv_qiu_2d.csv', mag_map[:, :, 0], delimiter=',')
 np.savetxt(save_path + '/mh_qiu_2d.csv', mag_map[:, :, 1], delimiter=',')
 print("Save files to:", save_path)
