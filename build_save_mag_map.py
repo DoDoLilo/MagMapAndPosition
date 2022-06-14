@@ -18,7 +18,6 @@ INTER_RADIUS = 1
 # 删除多余内插块的程度，越大删除的内插范围越大，可以为负值。
 DELETE_LEVEL = -3
 # 是否使用orientation传感器获取手机姿态角
-USE_ORIENTATION = False
 
 file_paths_build_map = [
     # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-1-4.247409484433081 Pixel 3a_sync.csv",

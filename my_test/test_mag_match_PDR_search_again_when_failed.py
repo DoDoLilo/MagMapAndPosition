@@ -3,7 +3,6 @@ import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
 
-# from scipy.spatial.transform import Rotation
 
 # iLocator真值坐标平移参数
 MOVE_X = 25.
@@ -24,22 +23,20 @@ DOWN_SIP_DIS = BLOCK_SIZE
 MAX_ITERATION = 90
 # 目标损失
 TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10
-print("TARGET_LOSS:", TARGET_LOSS, '\n')
+print("TARGET_LOSS:", TARGET_LOSS)
 # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 STEP = 1 / 50
 # 原始数据采样频率 , PDR坐标输出频率
 SAMPLE_FREQUENCY = 200
 PDR_XY_FREQUENCY = 20
-# 是否使用orientation传感器获取手机姿态角
-USE_ORIENTATION = False
 # 枚举transfers的产生参数，[0] = [△x, △y(米), △angle(弧度)] , [1] = [正负个数]
 TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)], [10, 10, 10]]
 # 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
 # Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-ORIGINAL_START_TRANSFER = [0, 0, math.radians(0.)]
+ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
 
 print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
@@ -53,7 +50,7 @@ paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
 
 def main():
     # 全流程
-    # 1.png、建库
+    # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
     mag_map_mv = np.array(np.loadtxt(PATH_MAG_MAP[0], delimiter=','))
     mag_map_mh = np.array(np.loadtxt(PATH_MAG_MAP[1], delimiter=','))
@@ -75,52 +72,35 @@ def main():
     MMT.change_axis(pdr_xy, MOVE_X, MOVE_Y)
     MMT.paint_xy(np.vstack((pdr_xy, iLocator_xy)), None, paint_map_size)
     data_mag = data_all[:, 21:24]
-    # data_ori = data_all[:, 18:21]
     data_quat = data_all[:, 7:11]
-    # q_R = Rotation.from_quat(data_quat)
-    # q_euler_angles = q_R.as_euler('zxy')
-    # data_angles = data_ori if USE_ORIENTATION else q_euler_angles
-    # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
+
     match_seq_list = MMT.samples_buffer_PDR(
         BUFFER_DIS, DOWN_SIP_DIS, data_quat, data_mag, pdr_xy,
         do_filter=True,
         lowpass_filter_level=EMD_FILTER_LEVEL,
         pdr_frequency=PDR_XY_FREQUENCY,
         sampling_frequency=SAMPLE_FREQUENCY,
-    )
+    )  # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
 
-    # 3、根据匹配段进行迭代，3种迭代结束情况：
-    #  A：迭代out_of_map返回True；B：迭代次数超出阈值但last_loss仍未达标；C：迭代last_loss小于阈值
-    # 情况AB表示匹配失败
-    #   3.1第一次匹配进行起点周围区域遍历，遍历后选出残差最小的
-    first_match = np.array(match_seq_list[0])
-    print("*Match Seq 0 : first search seq, deep ? or not?")
-    transfer = MMT.produce_transfer_candidates_search_again(ORIGINAL_START_TRANSFER, TRANSFERS_PRODUCE_CONFIG,
-                                                            first_match, mag_map, BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                            TARGET_LOSS, break_advanced=True)
-    out_of_map, loss, map_xy, not_used_transfer = MMT.cal_new_transfer_and_last_loss_xy(
-        transfer, first_match, mag_map, BLOCK_SIZE, STEP
-    )
-    if out_of_map or loss > TARGET_LOSS:
-        print("\t初始Transfer遍历查找失败!")
-        return
+    # 3、根据匹配段进行迭代
+    #  迭代结束情况：A：迭代out_of_map返回True；B：迭代次数超出阈值但last_loss仍未达标；C：迭代last_loss小于阈值。AB表示匹配失败
 
-    print("\tThe Start Track(Loss={0:.8}, Target Loss={2},Transfer={1}):"
-          .format(loss, [transfer[0], transfer[1], math.degrees(transfer[2])], TARGET_LOSS))
-    first_seq_transfer = transfer.copy()
+    #   3.1 给初始transfer
+    transfer = ORIGINAL_START_TRANSFER
 
-    #    3.2后续轨迹基于初始匹配进行迭代------------------------------------------------
-    map_xy_list = [map_xy]
+    #    3.2 基于初始匹配进行迭代
+    map_xy_list = []
     # TODO 收集评估参数，并绘制折线图？如何绘制，查找什么之间的关系？
 
-    for i in range(1, len(match_seq_list)):
+    for i in range(0, len(match_seq_list)):
         print("\nMatch Seq {0} :".format(i))
         # 获取实测待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
         match_seq = np.array(match_seq_list[i])
         iter_num = 0
         loss_list = []
         start_transfer = transfer.copy()  # NOTE: Use copy() if just pointer copy caused unexpect data changed
-        print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]".format(transfer[0], transfer[1], math.degrees(transfer[2])))
+        print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]"
+              .format(start_transfer[0], start_transfer[1], math.degrees(start_transfer[2])))
         # 核心循环搜索代码
         while True:
             iter_num += 1
@@ -146,7 +126,8 @@ def main():
                 transfer = MMT.produce_transfer_candidates_search_again(start_transfer, TRANSFERS_PRODUCE_CONFIG,
                                                                         match_seq, mag_map,
                                                                         BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                                        TARGET_LOSS, break_advanced=True)
+                                                                        TARGET_LOSS,
+                                                                        MMT.SearchPattern.BREAKE_ADVANCED)
                 break
 
         if not np.array_equal(transfer, start_transfer):
@@ -201,7 +182,7 @@ def main():
         index_list = index_list[:, np.newaxis]
         # 轨迹与pdr原始下标合并`
         map_xy_with_index = np.concatenate((map_xy, index_list), axis=1)
-        raw_xy = MMT.transfer_axis_list(match_seq[:, 0:2], first_seq_transfer)
+        raw_xy = MMT.transfer_axis_list(match_seq[:, 0:2], ORIGINAL_START_TRANSFER)
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
         # 计算轨迹距离
         distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
@@ -234,7 +215,7 @@ def main():
     final_index = final_index[:, np.newaxis]
     magPDR_xy = np.concatenate((final_xy, final_index), axis=1)
     # 4.4 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
-    pdr_xy = MMT.transfer_axis_list(pdr_xy, first_seq_transfer)
+    pdr_xy = MMT.transfer_axis_list(pdr_xy, ORIGINAL_START_TRANSFER)
     # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
         iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)

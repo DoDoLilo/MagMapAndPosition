@@ -1,4 +1,6 @@
 import math
+from enum import Enum
+
 import numpy as np
 from scipy import signal
 from PyEMD import EMD
@@ -69,33 +71,6 @@ def cal_length(x):
 
 
 # TODO:去掉这个abs()，把所有-1赋值、判断，替换为np.nan赋值、判断。np.array中不能存None，要将np.array设置为float后存np.nan
-# 增加使用ori或 game_rotation 计算得到的欧拉角：区别，用ori需要转为弧度，欧拉角不需要
-# 用论文方法和angles[方位角azimuth，俯仰角pitch，横滚角roll]计算mv,mh
-def get_mag_vh(angles, mag, use_orientation):
-    pitch = angles[1]
-    roll = angles[2]
-    if use_orientation:
-        pitch = math.radians(pitch)
-        roll = math.radians(roll)
-
-    # 需要保证pitch roll是弧度radians
-    mv = abs(
-        -math.sin(pitch) * mag[0] +
-        math.sin(roll) * math.cos(pitch) * mag[1] +
-        math.cos(roll) * math.cos(pitch) * mag[2]
-    )
-    mh = math.sqrt(mag[0] ** 2 + mag[1] ** 2 + mag[2] ** 2 - mv ** 2)
-    return mv, mh
-
-
-# 输入：orientation[N][3], mag[N][3]
-def get_mag_vh_arr(angles_arr, mag_arr, use_orientation):
-    list_mv_mh = []
-    for i in range(0, len(angles_arr)):
-        list_mv_mh.append(get_mag_vh(angles_arr[i], mag_arr[i], use_orientation))
-    return np.array(list_mv_mh)
-
-
 # q为四元数（game rotation vector)
 # 输入为序列，直接并行处理，不再是一个一个处理
 # 返回垂直磁强、水平磁强和总磁强
@@ -258,31 +233,21 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y,
                        radius=1,
                        block_size=0.3,
                        delete_extra_blocks=False, delete_level=0,
-                       lowpass_filter_level=3,
-                       use_orientation=False):
+                       lowpass_filter_level=3
+                       ):
     if len(file_paths) == 0:
         return None
 
     data_all = get_data_from_csv(file_paths[0])
     data_mag = data_all[:, 21:24]
-    # data_ori = data_all[:, 18:21]  # ORIENTATION 安卓自带的姿态角虚拟传感器
     data_quat = data_all[:, 7:11]  # GAME_ROTATION_VECTOR 未经磁场矫正的旋转向量（四元数）
     data_x_y = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
 
     for i in range(1, len(file_paths)):
         data_all = get_data_from_csv(file_paths[i])
         data_mag = np.vstack((data_mag, data_all[:, 21:24]))
-        # data_ori = np.vstack((data_ori, data_all[:, 18:21]))
         data_quat = np.vstack((data_quat, data_all[:, 7:11]))
         data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
-
-    # q_R = Rotation.from_quat(data_quat)
-    # q_euler_angles = q_R.as_euler('zxy')  # 通过GAME_ROTATION_VECTOR推出的手机姿态角
-    #  计算地磁总强度，垂直、水平分量
-    # if use_orientation:
-    #     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag, use_orientation=True)
-    # else:
-    #     arr_mv_mh = get_mag_vh_arr(q_euler_angles, data_mag, use_orientation=False)
 
     arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
     # emd滤波，太慢了，不过是建库阶段，无所谓
@@ -383,14 +348,11 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
 # --------------------------匹配阶段的算法----------------------------------------------------
 # 采样缓冲池_非实时（也使用累积距离）包括稀疏采样处理
 # 实现：1、计算mv,mh; 2、计算PDR累计距离
-# 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][ori[3], mag[3], [x,y]]
+# 输入：缓冲池长度buffer_dis，下采样距离down_sip_dis，采集的测试序列[N][quat[4], mag[3], [x,y]]
 #   正式测试匹配时输入的data_xy应该是PDR_x_y，而不是iLocator_xy，而且输出的是单条匹配序列
-#  NOTE:此时data_mag\ori还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
+#  NOTE:此时data_mag\quat还需与PDR_x_y对齐（不需要精确对齐？）后再输入（且PDR_xy为20帧/s和iLocator/手机 200帧/s不同），
 #  输出变为[PDR_x, PDR_y, aligned_mmv, aligned_mmh]
 # 输出：多条匹配序列[?][M][x,y, mv, mh]，注意不要转成np.array，序列长度M不一样
-# def samples_buffer(buffer_dis, down_sip_dis, data_ori, data_mag, data_xy,
-#                    do_filter=False, lowpass_filter_level=3, use_orientation=True):
-#     arr_mv_mh = get_mag_vh_arr(data_ori, data_mag, use_orientation)
 def samples_buffer(buffer_dis, down_sip_dis, data_quat, data_mag, data_xy,
                    do_filter=False, lowpass_filter_level=3):
     # 计算mv,mh分量,得到[N][mv, mh]
@@ -437,9 +399,8 @@ def samples_buffer(buffer_dis, down_sip_dis, data_quat, data_mag, data_xy,
 
 
 # 对实时采集到的原始磁场序列进行重采样（以空间距离为尺度）
-# NOTE:重采样前是要先进行垂直/水平分量计算的，因为和对应的orientation相关，而ori不能平均
-# 实现：按距离下采样？直线距离/累积距离？
-# --->累积距离：假设为0.3m，则0.15m处x,y的磁强 = 0.0 ~ 0.3m的磁强平均（坐标不能平均）
+# NOTE: 重采样前是要先进行mvh计算的，因为计算mvh和对应的quat_ori相关，而角度不能平均，显然不能平均后再计算mvh。
+# 实现：按累积距离下采样：假设为0.3m，则0.15m处x,y的磁强 = 0.0 ~ 0.3m的磁强平均（坐标不能平均）
 # 输入：下采样窗口下标start,mid,end，采集的匹配序列[x, y, mv, mh]
 # 输出：稀疏的 位置-磁场 序列[x, y, mmv, mmh]
 def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
@@ -704,45 +665,18 @@ def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy,
 # 所以PDR_x,y[0..i..]对应的时间应该为 i*0.05s，对应的数据帧为 i*10
 # 一个PDR_x,y坐标应该对应一个地磁值，和根据距离下采样时保持一致，该地磁值也应该用平均值！
 # 和simpl_buffer里的一致，达到距离阈值，则返回该段均值和该段mid坐标
-
 # ***所以PDR_x,y[i]对应的地磁 = mean( raw_mag[ i*10-5 : i*10 + 5] ); 不包括 +5
 
 # 函数：获取pdr坐标对应的地磁、方向原始数据(非平均)
-# 输入：pdr_xy[n1][2]=pdr模型输出的20Hz/s的xy序列, raw_mag[n2][3]=pdr对应的原始手机200Hz数据中的地磁，raw_ori[n2][3]=方向，
+# 输入：pdr_xy[n1][2]=pdr模型输出的20Hz/s的xy序列, raw_mag[n2][3]=pdr对应的原始手机200Hz数据中的地磁，raw_quat[n2][4]=方向，
 #      mean=False则使用单点地磁
-# 输出：PDR_xy_mag_ori[2+3+3=8]矩阵，[x,y, mag[0],mag[1],mag[2], ori[0],ori[1],ori[2]]
-def get_PDR_xy_mag_ori(pdr_xy, raw_mag, raw_ori, pdr_frequency=20, sampling_frequency=200):
-    if sampling_frequency < pdr_frequency:
-        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency < PDR_frequency")
-        return None
-    if sampling_frequency % pdr_frequency != 0:
-        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency % PDR_frequency != 0")
-        return None
-
-    window_size = int(sampling_frequency / pdr_frequency)
-    if window_size < 1:
-        print("get_PDR_xy_mag_ori(): Wrong PDR&simpling frequency!")
-        return None
-
-    PDR_xy_mag_ori = []
-    for i in range(0, len(pdr_xy)):
-        raw_i = i * window_size
-        # 越界则提前跳出循环，按理说正确的[pdr_frequency, simpling_frequency]不会有这种情况
-        if raw_i >= len(raw_mag):
-            print("get_PDR_xy_mag_ori(): Drop out in break!")
-            break
-        PDR_xy_mag_ori.append([pdr_xy[i][0], pdr_xy[i][1],
-                               raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
-                               raw_ori[raw_i][0], raw_ori[raw_i][1], raw_ori[raw_i][2]])
-    return np.array(PDR_xy_mag_ori)
-
-
+# 输出：PDR_xy_mag_quat[n1][2+3+4=9]矩阵，[x,y, mag[0],mag[1],mag[2], quat[0],quat[1],quat[2],quat[3]]
 def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampling_frequency=200):
     if sampling_frequency < pdr_frequency:
-        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency < PDR_frequency")
+        print("Wrong frequency in get_PDR_xy_align_mag_quat: sampling_frequency < PDR_frequency")
         return None
     if sampling_frequency % pdr_frequency != 0:
-        print("Wrong frequency in get_PDR_xy_mag_ori: sampling_frequency % PDR_frequency != 0")
+        print("Wrong frequency in get_PDR_xy_align_mag_quat: sampling_frequency % PDR_frequency != 0")
         return None
 
     window_size = int(sampling_frequency / pdr_frequency)
@@ -755,7 +689,7 @@ def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampl
         raw_i = i * window_size
         # 越界则提前跳出循环，按理说正确的[pdr_frequency, simpling_frequency]不会有这种情况
         if raw_i >= len(raw_mag):
-            print("get_PDR_xy_mag_ori(): Drop out in break!")
+            print("get_PDR_xy_align_mag_quat(): Drop out in break!")
             break
         PDR_xy_mag_quat.append([pdr_xy[i][0], pdr_xy[i][1],
                                 raw_mag[raw_i][0], raw_mag[raw_i][1], raw_mag[raw_i][2],
@@ -764,20 +698,12 @@ def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampl
 
 
 # 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作
-# 输入：buffer_dis: 缓冲池的距离, down_sip_dis: 下采样距离, data_angles: 手机姿态角集合, data_mag: 磁力向量集合,
+# 输入：buffer_dis: 缓冲池的距离, down_sip_dis: 下采样距离, data_quat: gameRotationVector, data_mag: 磁力向量集合,
 #     + data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, angles/mag采样频率sampling_frequency=200
-#     + use_orientation:是否使用orientation传感器获取的姿态角
 # 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]，注意不要转成np.array，序列长度M不一样
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
-# def samples_buffer_PDR(buffer_dis, down_sip_dis, data_angles, data_mag, PDR_xy,
-#                        do_filter=False,
-#                        lowpass_filter_level=3,
-#                        pdr_frequency=20,
-#                        sampling_frequency=200,
-#                        use_orientation=False):
-# 1.计算mv,mh分量,得到[N][mv, mh]
-# arr_mv_mh = get_mag_vh_arr(data_angles, data_mag, use_orientation)
-def samples_buffer_PDR(buffer_dis, down_sip_dis, data_quat, data_mag, PDR_xy,
+def samples_buffer_PDR(buffer_dis, down_sip_dis,
+                       data_quat, data_mag, PDR_xy,
                        do_filter=False,
                        lowpass_filter_level=3,
                        pdr_frequency=20,
@@ -867,7 +793,6 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis, data_quat, data_mag, PDR_xy,
 # 输出：满足要求的候选transfer_candidates[m][3] （包括original_transfer）
 def produce_transfer_candidates_ascending(original_transfer, config):
     transfer_candidates = []
-    # transfer_candidates.append(original_transfer)
     x_candidates = []
     y_candidates = []
     angle_candidates = []
@@ -886,12 +811,6 @@ def produce_transfer_candidates_ascending(original_transfer, config):
     for ta in range(1, config[1][2]):
         angle_candidates.append(original_transfer[2] + ta * config[0][2])
         angle_candidates.append(original_transfer[2] - ta * config[0][2])
-
-    # 三重for循环将这些候选分量重组
-    # for x in x_candidates:
-    #     for y in y_candidates:
-    #         for angle in angle_candidates:
-    #             transfer_candidates.append([x, y, angle])
 
     # 将这些候选分量按变换距离升序重新排列组和。x,y,z_candidates内部已按升序
     # 所以，以(i_x + i_y + i_angle)作为新组合的下标，
@@ -922,9 +841,15 @@ def produce_transfer_candidates_ascending(original_transfer, config):
 # 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
 # NOTE：注意 地址拷贝（浅拷贝） 和 值拷贝（深拷贝） 的问题。
 # 如果遍历候选项的过程中找到了符合target_loss的，则提前返回结果
+class SearchPattern(Enum):
+    FULL_DEEP = 0
+    BREAKE_ADVANCED = 1
+
+
 def produce_transfer_candidates_search_again(start_transfer, area_config,
                                              match_seq, mag_map, block_size, step, max_iteration,
-                                             target_loss, break_advanced=True):
+                                             target_loss,
+                                             search_pattern=SearchPattern.BREAKE_ADVANCED):
     # 1.生成小范围的所有transfer_candidates（且范围由近到远）
     transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
 
@@ -939,7 +864,7 @@ def produce_transfer_candidates_search_again(start_transfer, area_config,
             if not out_of_map:
                 if loss <= target_loss:
                     last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
-                    if break_advanced:
+                    if search_pattern == SearchPattern.BREAKE_ADVANCED:
                         print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
                         return transfer
             else:
@@ -948,7 +873,7 @@ def produce_transfer_candidates_search_again(start_transfer, area_config,
         if last_loss_xy_tf_num is not None:
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
-    if break_advanced:
+    if search_pattern == SearchPattern.BREAKE_ADVANCED:
         print("\t\t.*Failed again, use last transfer.")
         return start_transfer
 
@@ -1059,6 +984,6 @@ def cal_grads_level_mag_vh(mag_map_grads):
     return grad_level_mv, grad_level_mh, grad_level_all
 
 
-# TODO 根据特征计算判断是否要使用当前transfer
+# TODO 根据特征计算判断是否要使用当前transfer，这个经由卡尔曼滤波实现
 def trusted_mag_features():
     return True
