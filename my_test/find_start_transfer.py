@@ -30,10 +30,10 @@ BUFFER_DIS = 5
 DOWN_SIP_DIS = BLOCK_SIZE
 
 # PATH_PDR_RAW[0]是pdr的xy.npy文件,[1]是增加了真值的手机IMU数据文件.csv
-ORIGINAL_START_TRANSFER = [38.9, 11.8, math.radians(-97.)]
+ORIGINAL_START_TRANSFER = [24.9, 12.3, math.radians(-97.)]
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-4-187.68290595817584 Pixel 3a.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-1-17.064372160083312 Pixel 3a.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
 
 pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
 
@@ -61,7 +61,7 @@ final_xy = np.array(final_xy)
 # MMT.paint_xy(pdr_xy)
 # MMT.paint_xy(final_xy)
 MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
-MMT.change_axis(final_xy, MOVE_X, MOVE_Y)
+# MMT.change_axis(final_xy, MOVE_X, MOVE_Y)
 new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, ORIGINAL_START_TRANSFER))
 # MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
 

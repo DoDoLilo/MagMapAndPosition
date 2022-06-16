@@ -578,10 +578,10 @@ def cal_matrix_H(mag_map_grad, xy_grad):
 # 匹配全流程：
 # 输入：上一次迭代的transfer(i)向量，缓冲池给的稀疏序列sparse_PDR_Mag[M]，最终的地磁地图Mag_Map[i][j][mv, mh](存在-1)
 # 输出：迭代越界失败标志，上一次迭代的transfer(i)对应残差平方和、坐标序列xy(i)， 迭代后的 transfer(i+1)，
-def cal_new_transfer_and_last_loss_xy(transfer, sparse_PDR_mag, mag_map, block_size, step):
+def cal_new_transfer_and_last_loss_xy(transfer, sparse_pdr_xy_mvh, mag_map, block_size, step):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
-    pdr_xy = sparse_PDR_mag[:, 0:2]
-    pdr_mvh = sparse_PDR_mag[:, 2:4]
+    pdr_xy = sparse_pdr_xy_mvh[:, 0:2]
+    pdr_mvh = sparse_pdr_xy_mvh[:, 2:4]
     map_xy = []
     xy_grads = []
     for xy in pdr_xy:
@@ -835,46 +835,66 @@ def produce_transfer_candidates_ascending(original_transfer, config):
     return np.array(transfer_candidates)
 
 
-# 输入：用于生成transfer_candidates：初始变换向量original_transfer，范围参数area_config，
-#     用于高斯牛顿迭代的：待匹配序列match_seq，地磁地图mag_map，块大小block_size，迭代步长step，最大迭代次数max_iteration
-#     用于筛选候选项的：目标损失target_loss
-# 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
-# NOTE：注意 地址拷贝（浅拷贝） 和 值拷贝（深拷贝） 的问题。
-# 如果遍历候选项的过程中找到了符合target_loss的，则提前返回结果
 class SearchPattern(Enum):
     FULL_DEEP = 0
     BREAKE_ADVANCED = 1
 
 
+# 输入：用于生成transfer_candidates：初始变换向量original_transfer，范围参数area_config，
+#     用于高斯牛顿迭代的：待匹配序列match_seq，地磁地图mag_map，块大小block_size，迭代步长step，最大迭代次数max_iteration
+#     用于筛选候选项的：目标损失target_loss
+#      upper_limit_of_gaussnewteon 当前参数下的高斯牛顿迭代可降低的loss上限，是一个经验值，避免注定会搜索失败的候选项，提高性能！
+#      search_pattern 是否在找到小于target loss的transfer就马上退出
+# 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
 def produce_transfer_candidates_search_again(start_transfer, area_config,
                                              match_seq, mag_map, block_size, step, max_iteration,
                                              target_loss,
+                                             upper_limit_of_gaussnewteon,
                                              search_pattern=SearchPattern.BREAKE_ADVANCED):
     # 1.生成小范围的所有transfer_candidates（且范围由近到远）
     transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
 
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
     candidates_loss_xy_tf = []
+    max_mean_sub_loss = 0
     for transfer in transfer_candidates:
+        # 根据经验判断当前loss是否已经超出了高斯牛顿迭代的优化能力
+        out_of_map, start_loss, not_use_map_xy, not_use_transfer = cal_new_transfer_and_last_loss_xy(
+            transfer, match_seq, mag_map, block_size, step)
+        if out_of_map or start_loss - target_loss > upper_limit_of_gaussnewteon:
+            # 超过了高斯牛顿的迭代能力，不用继续迭代了，直接下一个candidate
+            # NOTE：如果用了新的文件打算找新的max_mean_sub_loss，则要注释掉这个逻辑！
+            continue
+
         last_loss_xy_tf_num = None
+        loss_list = []
         for iter_num in range(0, max_iteration):
             out_of_map, loss, map_xy, transfer = cal_new_transfer_and_last_loss_xy(
-                transfer, match_seq, mag_map, block_size, step
-            )
+                transfer, match_seq, mag_map, block_size, step)
             if not out_of_map:
+                loss_list.append(loss)
                 if loss <= target_loss:
                     last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
                     if search_pattern == SearchPattern.BREAKE_ADVANCED:
                         print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
+                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
+                            loss_list) > 1 else 0
+                        max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
+                        print("\t\t.max mean loss sub = ", max_mean_sub_loss)
                         return transfer
             else:
                 break
+
+        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
+            loss_list) > 1 else 0
+        max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
 
         if last_loss_xy_tf_num is not None:
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
     if search_pattern == SearchPattern.BREAKE_ADVANCED:
         print("\t\t.*Failed again, use last transfer.")
+        print("\t\t.max mean loss sub = ", max_mean_sub_loss)
         return start_transfer
 
     # 3.选出候选集中Loss最小的项，返回其transfer；

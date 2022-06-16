@@ -3,52 +3,58 @@ import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
 
-
-# iLocator真值坐标平移参数
-MOVE_X = 25.
+# -----------地图系统参数------------------
+MOVE_X = 25.  # iLocator真值坐标平移参数
 MOVE_Y = 12.
-# 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
-MAP_SIZE_X = 58.
+MAP_SIZE_X = 58.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
 MAP_SIZE_Y = 16.
-# 地图地磁块大小
-BLOCK_SIZE = 0.25
-# 低通滤波的程度，值越大滤波越强。整型，无单位。
-EMD_FILTER_LEVEL = 3
-# ------------------------
-# 缓冲池大小，单位（m）
-BUFFER_DIS = 5
-# 下采样粒度，应为块大小的整数倍？（下采样越小，匹配难度越大！）
-DOWN_SIP_DIS = BLOCK_SIZE
-# 高斯牛顿最大迭代次数
-MAX_ITERATION = 90
-# 目标损失
-TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10
-print("TARGET_LOSS:", TARGET_LOSS)
-# 迭代步长，牛顿高斯迭代是局部最优，步长要小
-STEP = 1 / 50
-# 原始数据采样频率 , PDR坐标输出频率
-SAMPLE_FREQUENCY = 200
-PDR_XY_FREQUENCY = 20
-# 枚举transfers的产生参数，[0] = [△x, △y(米), △angle(弧度)] , [1] = [正负个数]
-TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)], [10, 10, 10]]
-# 首次迭代固定区域遍历数组，默认起点在某一固定区域，transfer=[△x,△y,△angle]，
-# Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]
+BLOCK_SIZE = 0.25  # 地图块大小
+EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
+BUFFER_DIS = 5  # 缓冲池大小，单位（m）
+DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度，应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
+# --------迭代搜索参数----------------------
+MAX_ITERATION = 90  # 高斯牛顿最大迭代次数
+TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10  # 目标损失
+STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
+UPPER_LIMIT_OF_GAUSSNEWTEON = 10 * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
+# ---------其他参数----------------------------
+SAMPLE_FREQUENCY = 200  # 原始数据采样频率
+PDR_XY_FREQUENCY = 20  # PDR坐标输出频率
+TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)],  # 枚举transfers的参数，[0] = [△x, △y(米), △angle(弧度)]
+                            [10, 10, 10]]  # [1] = [枚举的正负个数]
+ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
+# ---------数据文件路径---------------------------
+# 607-1
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
+#
+# 607-2
+# PATH_PDR_RAW = [
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv.npy",
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv"]
+#
+# 607-3
+# PATH_PDR_RAW = [
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv.npy",
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
+#
+# 607-4
+# PATH_PDR_RAW = [
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
 
-print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
 PATH_MAG_MAP = [
     "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mv_qiu_2d.csv",
     "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mh_qiu_2d.csv"
 ]
-# ----------------------------
-paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
 
 
 def main():
+    paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
+    print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
+    print("TARGET_LOSS:", TARGET_LOSS)
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
@@ -113,7 +119,8 @@ def main():
             if not out_of_map:
                 loss_list.append(loss)
                 if loss <= TARGET_LOSS:
-                    print("\tSucceed in iteration", iter_num, ", loss list:", loss_list)
+                    print("\tSucceed in iteration", iter_num, " Mean loss sub:",
+                          (loss_list[0] - loss_list[len(loss_list) - 1]) / len(loss_list), ", loss list:", loss_list)
                     # 成功了怎么办：提前结束迭代，先不添加该结果，等待后续特征判断
                     break
 
@@ -121,12 +128,15 @@ def main():
             if out_of_map or iter_num > MAX_ITERATION:
                 # 失败了怎么办：
                 # 在迭代前备份的start_transfer基础上进行范围搜索，范围从近到远，匹配成功则提前结束。
-                print("\tFailed in iteration", iter_num, ", loss list:", loss_list,
+                print("\tFailed in iteration", iter_num, " Mean loss sub:",
+                      (loss_list[0] - loss_list[len(loss_list) - 1]) / len(loss_list) if len(
+                          loss_list) != 0 else None, ", loss list:", loss_list,
                       "\n\tSearch more in the start_transfer ... ...")
                 transfer = MMT.produce_transfer_candidates_search_again(start_transfer, TRANSFERS_PRODUCE_CONFIG,
                                                                         match_seq, mag_map,
                                                                         BLOCK_SIZE, STEP, MAX_ITERATION,
                                                                         TARGET_LOSS,
+                                                                        UPPER_LIMIT_OF_GAUSSNEWTEON,
                                                                         MMT.SearchPattern.BREAKE_ADVANCED)
                 break
 
