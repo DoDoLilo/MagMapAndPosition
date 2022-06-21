@@ -62,7 +62,7 @@ final_xy = np.array(final_xy)
 # MMT.paint_xy(final_xy)
 MMT.change_axis(raw_xy, MOVE_X, MOVE_Y)
 # MMT.change_axis(final_xy, MOVE_X, MOVE_Y)
-new_pdr_xy = np.array(MMT.transfer_axis_list(final_xy, ORIGINAL_START_TRANSFER))
+new_pdr_xy = np.array(MMT.transfer_axis_of_xy_seq(final_xy, ORIGINAL_START_TRANSFER))
 # MMT.paint_xy(new_pdr_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])
 
 # MMT.paint_xy(raw_xy, xy_range=[0, MAP_SIZE_X, 0, MAP_SIZE_Y])

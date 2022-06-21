@@ -101,51 +101,24 @@ def main():
 
     for i in range(0, len(match_seq_list)):
         print("\nMatch Seq {0} :".format(i))
-        # 获取实测待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
-        match_seq = np.array(match_seq_list[i])
-        iter_num = 0
-        loss_list = []
+        match_seq = np.array(match_seq_list[i])  # 待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
         start_transfer = transfer.copy()  # NOTE: Use copy() if just pointer copy caused unexpect data changed
         print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]"
               .format(start_transfer[0], start_transfer[1], math.degrees(start_transfer[2])))
-        # 核心循环搜索代码
-        while True:
-            iter_num += 1
-            # 单次高斯牛顿迭代
-            out_of_map, loss, map_xy, transfer = MMT.cal_new_transfer_and_last_loss_xy(
-                transfer, match_seq, mag_map, BLOCK_SIZE, STEP
-            )
+        # 1.核心循环搜索代码
+        transfer, map_xy = MMT.produce_transfer_candidates_and_search(start_transfer, TRANSFERS_PRODUCE_CONFIG,
+                                                                      match_seq, mag_map,
+                                                                      BLOCK_SIZE, STEP, MAX_ITERATION,
+                                                                      TARGET_LOSS,
+                                                                      UPPER_LIMIT_OF_GAUSSNEWTEON,
+                                                                      MMT.SearchPattern.BREAKE_ADVANCED)
+        map_xy_list.append(map_xy)
 
-            # 如果没出界
-            if not out_of_map:
-                loss_list.append(loss)
-                if loss <= TARGET_LOSS:
-                    print("\tSucceed in iteration", iter_num, " Mean loss sub:",
-                          (loss_list[0] - loss_list[len(loss_list) - 1]) / len(loss_list), ", loss list:", loss_list)
-                    # 成功了怎么办：提前结束迭代，先不添加该结果，等待后续特征判断
-                    break
-
-            # 如果出界或者超出迭代次数仍未找到目标
-            if out_of_map or iter_num > MAX_ITERATION:
-                # 失败了怎么办：
-                # 在迭代前备份的start_transfer基础上进行范围搜索，范围从近到远，匹配成功则提前结束。
-                print("\tFailed in iteration", iter_num, " Mean loss sub:",
-                      (loss_list[0] - loss_list[len(loss_list) - 1]) / len(loss_list) if len(
-                          loss_list) != 0 else None, ", loss list:", loss_list,
-                      "\n\tSearch more in the start_transfer ... ...")
-                transfer = MMT.produce_transfer_candidates_search_again(start_transfer, TRANSFERS_PRODUCE_CONFIG,
-                                                                        match_seq, mag_map,
-                                                                        BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                                        TARGET_LOSS,
-                                                                        UPPER_LIMIT_OF_GAUSSNEWTEON,
-                                                                        MMT.SearchPattern.BREAKE_ADVANCED)
-                break
-
+        # 2.如果找到新的transfer，则计算指纹库的磁场特征
         if not np.array_equal(transfer, start_transfer):
-            # 找到了新的符合loss要求的transfer，但还要根据新的transfer计算指纹库磁场特征
             print("\tFound new transfer:[{0:.5}, {1:.5}, {2:.5}°]"
                   .format(transfer[0], transfer[1], math.degrees(transfer[2])))
-            temp_map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
+            temp_map_xy = MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], transfer)
             mag_map_mvh = []
             mag_map_grads = []
             for xy in temp_map_xy:
@@ -170,7 +143,7 @@ def main():
             if not MMT.trusted_mag_features():
                 transfer = start_transfer
 
-        # 计算实测序列中的地磁序列的特征程度，并打印输出结果
+        # 3. 计算实测序列中的地磁序列的特征
         mag_vh_arr = match_seq[:, 2:4]
         # PT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
         # PT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
@@ -182,10 +155,8 @@ def main():
               .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
                       unsameness_mv, unsameness_mh, unsameness_all))
         # 特征输出完毕，这些print后续可以去掉-----------------------------------------------------------------------------
-        # 计算该段MagPDR轨迹序列map_xy，并添加到结果集中
-        map_xy = MMT.transfer_axis_list(match_seq[:, 0:2], transfer)
-        map_xy_list.append(map_xy)
-        # 计算该段raw_xy（仅初始对齐的PDR轨迹）\map_xy和真值iLocator_xy的误差距离，并打印输出
+
+        # 4.计算该段raw_xy（仅初始对齐的PDR轨迹）\map_xy和真值iLocator_xy的误差距离，并打印输出
         index_list = []
         for p in match_seq:
             index_list.append(p[4])
@@ -193,7 +164,7 @@ def main():
         index_list = index_list[:, np.newaxis]
         # 轨迹与pdr原始下标合并`
         map_xy_with_index = np.concatenate((map_xy, index_list), axis=1)
-        raw_xy = MMT.transfer_axis_list(match_seq[:, 0:2], ORIGINAL_START_TRANSFER)
+        raw_xy = MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], ORIGINAL_START_TRANSFER)
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
         # 计算轨迹距离
         distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
@@ -226,7 +197,7 @@ def main():
     final_index = final_index[:, np.newaxis]
     magPDR_xy = np.concatenate((final_xy, final_index), axis=1)
     # 4.4 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
-    pdr_xy = MMT.transfer_axis_list(pdr_xy, ORIGINAL_START_TRANSFER)
+    pdr_xy = MMT.transfer_axis_of_xy_seq(pdr_xy, ORIGINAL_START_TRANSFER)
     # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
         iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
@@ -247,11 +218,11 @@ def main():
     PT.paint_xy_list([iLocator_xy], ["GT by iLocator"], paint_map_size, ' ')
     PT.paint_xy_list([pdr_xy], ["PDR"], paint_map_size, ' ')
     PT.paint_xy_list([final_xy],
-                      ['MagPDR'],
-                      paint_map_size,
-                      "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
-                      .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS)
-                      )
+                     ['MagPDR'],
+                     paint_map_size,
+                     "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
+                     .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS)
+                     )
     PT.paint_xy_list([iLocator_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines")
     return
 

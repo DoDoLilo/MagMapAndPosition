@@ -459,7 +459,7 @@ def transfer_axis_with_grad(transfer, x0, y0):
 
 # 输入：轨迹序列，转换向量
 # 输出：转换后的轨迹list
-def transfer_axis_list(pdr_xy, transfer):
+def transfer_axis_of_xy_seq(pdr_xy, transfer):
     map_xy = []
     for xy in pdr_xy:
         x, y, grad = transfer_axis_with_grad(transfer, xy[0], xy[1])
@@ -762,13 +762,13 @@ class SearchPattern(Enum):
 #     用于筛选候选项的：目标损失target_loss
 #      upper_limit_of_gaussnewteon 当前参数下的高斯牛顿迭代可降低的loss上限，是一个经验值，避免注定会搜索失败的候选项，提高性能！
 #      search_pattern 是否在找到小于target loss的transfer就马上退出
-# 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer）。
-def produce_transfer_candidates_search_again(start_transfer, area_config,
-                                             match_seq, mag_map, block_size, step, max_iteration,
-                                             target_loss,
-                                             upper_limit_of_gaussnewteon,
-                                             search_pattern=SearchPattern.BREAKE_ADVANCED):
-    # 1.生成小范围的所有transfer_candidates（且范围由近到远）
+# 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer），以及其对应的map_xy
+def produce_transfer_candidates_and_search(start_transfer, area_config,
+                                           match_seq, mag_map, block_size, step, max_iteration,
+                                           target_loss,
+                                           upper_limit_of_gaussnewteon,
+                                           search_pattern=SearchPattern.BREAKE_ADVANCED):
+    # 1.生成小范围的所有transfer_candidates（包括start_transfer，且范围由近到远）
     transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
 
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
@@ -786,49 +786,53 @@ def produce_transfer_candidates_search_again(start_transfer, area_config,
         last_loss_xy_tf_num = None
         loss_list = []
         for iter_num in range(0, max_iteration):
-            out_of_map, loss, map_xy, transfer = cal_new_transfer_and_last_loss_xy(
+            out_of_map, loss, map_xy, next_transfer = cal_new_transfer_and_last_loss_xy(
                 transfer, match_seq, mag_map, block_size, step)
+
             if not out_of_map:
                 loss_list.append(loss)
                 if loss <= target_loss:
                     last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
                     if search_pattern == SearchPattern.BREAKE_ADVANCED:
                         print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
-                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
-                            loss_list) > 1 else 0
+                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(loss_list) > 1 else 0
                         max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
                         print("\t\t.max mean loss sub = ", max_mean_sub_loss)
-                        return transfer
+                        return transfer, map_xy
+                else:
+                    transfer = next_transfer
             else:
                 break
 
-        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
-            loss_list) > 1 else 0
+        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(loss_list) > 1 else 0
         max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
 
         if last_loss_xy_tf_num is not None:
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
     if search_pattern == SearchPattern.BREAKE_ADVANCED:
-        print("\t\t.*Failed again, use last transfer.")
+        print("\t\t.Failed search, use last transfer.")
         print("\t\t.max mean loss sub = ", max_mean_sub_loss)
-        return start_transfer
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
 
-    # 3.选出候选集中Loss最小的项，返回其transfer；
-    #     若无候选项，则表示小范围寻找失败，返回original_transfer
+    # if search_pattern == SearchPattern.FULL_DEEP:
+    # 选出候选集中Loss最小的项，返回其transfer；
+    # 若无候选项，则表示小范围寻找失败，返回original_transfer
     transfer = None
     min_loss = None
+    min_xy = None
     for c in candidates_loss_xy_tf:
         if min_loss is None or c[0] < min_loss:
             min_loss = c[0]
+            min_xy = c[1]
             transfer = c[2]
 
     if transfer is None:
-        print("\t\t.search Failed, use last transfer.")
-        return start_transfer
-
-    print("\t\t.search Succeed, final loss = ", min_loss)
-    return transfer
+        print("\t\t.Failed search, use last transfer.")
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
+    else:
+        print("\t\t.Succeed search, final loss = ", min_loss)
+        return transfer, min_xy
 
 
 # 均值移除

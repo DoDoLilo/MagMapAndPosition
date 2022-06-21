@@ -135,7 +135,7 @@ def main():
                 transfer = last_transfer.copy()
                 # TODO 如果不相信PDR，则和第一条序列一样，给当前序列也进行小范围遍历？
                 print("中间轨迹匹配失败！选择：相信PDR和之前的transfer", [transfer[0], transfer[1], math.degrees(transfer[2])])
-                map_xy_list.append(MMT.transfer_axis_list(match_seq[:, 0:2], transfer))
+                map_xy_list.append(MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], transfer))
                 break
             if loss <= TARGET_LOSS:
                 print("Match Seq:", i, "iteration ", iter_num, ", Succeed!")
@@ -167,7 +167,7 @@ def main():
     # 4.5 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
     # 4.6 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
-    pdr_xy = MMT.transfer_axis_list(pdr_xy, start_transfer)
+    pdr_xy = MMT.transfer_axis_of_xy_seq(pdr_xy, start_transfer)
     # 4.7 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
         iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
