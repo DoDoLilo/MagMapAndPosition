@@ -8,7 +8,7 @@ from dtaidistance import dtw
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.spatial.transform import Rotation
-import matplotlib.lines as mlines
+import paint_tools as PT
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
@@ -52,18 +52,6 @@ def down_sampling_by_mean(data, factor):
     for i in range(0, len(data) - factor + 1, factor):
         data_down.append(np.mean(data[i:i + factor]))
     return np.array(data_down)
-
-
-# 对输入的一维数组进行绘制查看波形
-def paint_signal(data_signal, title='data', ylim=60):
-    plt.figure(figsize=(3, 7))
-    x = range(0, len(data_signal))
-    plt.title(label=title, loc='center')
-    plt.ylim(0, ylim)
-    plt.plot(x, data_signal, label='line', color='g', linewidth=1.0, linestyle='-')
-    plt.show()
-    plt.close()
-    return
 
 
 def cal_length(x):
@@ -162,19 +150,6 @@ def cal_weighted_average(candidates):
     return mv_ave, mh_ave
 
 
-# ---------------------2022/2/14----------------------------------------
-# 绘制二维坐标图
-def paint_xy(arr_x_y, title=None, xy_range=None):
-    if xy_range is not None:
-        plt.figure(figsize=(xy_range[1] - xy_range[0], xy_range[3] - xy_range[2]))
-        plt.xlim(xy_range[0], xy_range[1])
-        plt.ylim(xy_range[2], xy_range[3])
-    plt.title(title)
-    plt.scatter(arr_x_y[:, 0], arr_x_y[:, 1])
-    plt.show()
-    return
-
-
 # 数组arr_mv_mh栅格化 block_size=0.3(m)
 # 输入：arr_mv_mh[N][2] ， x_y_GT轨迹[N][2]，地图范围，块大小
 # 输出：rast_mv_mh[x][y][mv][mh]
@@ -258,48 +233,14 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y,
     change_axis(data_x_y, move_x, move_y)
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
     # 内插填补，绘制结果
-    paint_heat_map(rast_mv_mh)
+    PT.paint_heat_map(rast_mv_mh)
     rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
     inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
-    # paint_heat_map(rast_mv_mh, fill_num)
+    # PT.paint_heat_map(rast_mv_mh, fill_num)
     if delete_extra_blocks:
         delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
-    paint_heat_map(rast_mv_mh)
+    PT.paint_heat_map(rast_mv_mh)
     return rast_mv_mh
-
-
-# 根据块绘制栅格地磁强度图（热力图）
-# cmap:YlOrRd
-# 输入：[x][y][mv, mh]
-def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
-    if show_mv:
-        plt.figure(figsize=(10, 36))
-        plt.title('mag_vertical_' + str(num))
-        # sns.set(font_scale=0.8)
-        # cmap='YlOrRd'
-        sns.heatmap(
-            data=arr_mv_mh[:, :, 0],
-            cmap='jet',
-            # annot=True, fmt='.0f',
-            mask=arr_mv_mh[:, :, 0] == -1,
-            cbar=True, vmax=65, vmin=-1
-        )
-        plt.show()
-
-    if show_mh:
-        plt.figure(figsize=(10, 36))
-        plt.title('mag_horizontal_' + str(num))
-        # sns.set(font_scale=0.8)
-        # cmap='YlOrRd'
-        sns.heatmap(
-            data=arr_mv_mh[:, :, 1],
-            cmap='jet',
-            # annot=True, fmt='.0f',
-            mask=arr_mv_mh[:, :, 1] == -1,
-            cbar=True, vmax=65, vmin=-1
-        )
-        plt.show()
-    return
 
 
 # 循环调用内插填补
@@ -634,30 +575,6 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_pdr_xy_mvh, mag_map, bloc
     return out_of_map, loss, map_xy, new_transfer
 
 
-# 输入：建图各种参数：图长宽、块大小，绘图轨迹序列(已经栅格化的)，迭代次数，
-# 思路：创建和mag_map一样大小的二维空数组，在其中绘图，如果两次序列一样，则不绘图
-def paint_iteration_results(map_size_x, map_size_y, block_size, last_xy, new_xy, num):
-    # 先根据地图、块大小，计算块的个数，得到数组的长度。向上取整
-    shape = [math.ceil(map_size_x / block_size), math.ceil(map_size_y / block_size)]
-    map = np.zeros(shape, dtype=float)
-    different = False
-    for last, new in zip(last_xy, new_xy):
-        if last[0] != new[0] or last[1] != new[1]:
-            different = True
-            break
-
-    if different:
-        for new in new_xy:
-            map[int(new[0])][int(new[1])] = 1.
-        plt.figure(figsize=(19, 10))
-        plt.title('Iteration_' + str(num))
-        sns.set(font_scale=0.8)
-        sns.heatmap(map, cmap='YlOrRd', annot=False)
-        plt.show()
-
-    return
-
-
 # ----------------PDR相关--------------------------------------------------------------------------------------------
 # PDR window size = 200，simple frequency=200Hz/s，sliding window size=10
 # 而PDR模型输出为该窗口的平均速度v，认为该1秒的窗口速度相同，每 10/200s = 0.05s输出一速度
@@ -742,9 +659,9 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
                                   np.mean(arr_mv_mh[window_start:window_end, 1])])
         else:
             break
-    # paint_signal(arr_mv_mh[:, 1], "Before align with PDR")
+    # PT.paint_signal(arr_mv_mh[:, 1], "Before align with PDR")
     arr_mv_mh = np.array(arr_mv_mh_pdr)
-    # paint_signal(arr_mv_mh[:, 1], "After align with PDR")
+    # PT.paint_signal(arr_mv_mh[:, 1], "After align with PDR")
     # + 相比原来的samples_buffer()  End
 
     # 4. for遍历PDR_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling

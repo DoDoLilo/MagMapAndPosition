@@ -2,6 +2,7 @@ import math
 import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
+import paint_tools as PT
 
 # -----------地图系统参数------------------
 MOVE_X = 25.  # iLocator真值坐标平移参数
@@ -67,7 +68,7 @@ def main():
             temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
         mag_map.append(temp)
     mag_map = np.array(mag_map)
-    # MMT.paint_heat_map(mag_map)
+    PT.paint_heat_map(mag_map)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
@@ -76,7 +77,7 @@ def main():
     # 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
     MMT.change_axis(pdr_xy, MOVE_X, MOVE_Y)
-    MMT.paint_xy(np.vstack((pdr_xy, iLocator_xy)), None, paint_map_size)
+    PT.paint_xy_list([iLocator_xy, pdr_xy], ['GT', 'PDR'], paint_map_size, ' ')
     data_mag = data_all[:, 21:24]
     data_quat = data_all[:, 7:11]
 
@@ -153,8 +154,8 @@ def main():
                 mag_map_mvh.append(map_mvh)
                 mag_map_grads.append(grad)
             mag_map_mvh = np.array(mag_map_mvh)
-            # MMT.paint_signal(mag_map_mvh[:, 0], "Map mv Seq {0}".format(i))
-            # MMT.paint_signal(mag_map_mvh[:, 1], "Map mh Seq {0}".format(i))
+            # PT.paint_signal(mag_map_mvh[:, 0], "Map mv Seq {0}".format(i))
+            # PT.paint_signal(mag_map_mvh[:, 1], "Map mh Seq {0}".format(i))
             std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_map_mvh)  # 标准差
             unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_map_mvh)  # 相邻不相关程度
             grad_level_mv, grad_level_mh, grad_level_all = MMT.cal_grads_level_mag_vh(mag_map_grads)  # 整体梯度水平
@@ -171,8 +172,8 @@ def main():
 
         # 计算实测序列中的地磁序列的特征程度，并打印输出结果
         mag_vh_arr = match_seq[:, 2:4]
-        # MMT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
-        # MMT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
+        # PT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
+        # PT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
         std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
         unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
         print("\tFeatures of real time mag: "
@@ -243,15 +244,15 @@ def main():
     mean_distance = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
     print("\tMean Distance between MagPDR and GT: ", mean_distance)
     # 5.3 对Ground Truth(iLocator)、PDR、MagPDR进行绘图
-    MMT.paint_xy(iLocator_xy, "The Ground Truth by iLocator", paint_map_size)
-    MMT.paint_xy(pdr_xy, "The PDR", paint_map_size)
-    MMT.paint_xy(final_xy, "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
-                 .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS),
-                 paint_map_size)
-    contrast_xy = np.vstack((iLocator_xy, np.vstack((pdr_xy, final_xy))))
-    MMT.paint_xy(contrast_xy, "Three contrast xy", paint_map_size)
-    # paint_single_heat_map(mag_map, [gt, pos, cali_positions], ['line', 'line', 'line'], ['真实轨迹','PDR轨迹','EKF融合轨迹'],['black', 'purple', 'red'])
-
+    PT.paint_xy_list([iLocator_xy], ["GT by iLocator"], paint_map_size, ' ')
+    PT.paint_xy_list([pdr_xy], ["PDR"], paint_map_size, ' ')
+    PT.paint_xy_list([final_xy],
+                      ['MagPDR'],
+                      paint_map_size,
+                      "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
+                      .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS)
+                      )
+    PT.paint_xy_list([iLocator_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines")
     return
 
 
