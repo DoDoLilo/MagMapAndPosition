@@ -5,8 +5,6 @@ import numpy as np
 from scipy import signal
 from PyEMD import EMD
 from dtaidistance import dtw
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.spatial.transform import Rotation
 import paint_tools as PT
 
@@ -617,54 +615,48 @@ def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampl
 # 输入的data_xy变为不同频率的PDR_xy的缓冲池函数，区别在于内置了对原始数据与PDRxy数据之间的对齐、平均的操作
 # 输入：buffer_dis: 缓冲池的距离, down_sip_dis: 下采样距离, data_quat: gameRotationVector, data_mag: 磁力向量集合,
 #     + data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, angles/mag采样频率sampling_frequency=200
-# 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]，注意不要转成np.array，序列长度M不一样
+# 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
+# TODO : 额外返回一个 list 记录每个滑动窗口对应的 坐标个数
 def samples_buffer_PDR(buffer_dis, down_sip_dis,
-                       data_quat, data_mag, PDR_xy,
+                       data_quat, data_mag, pdr_xy,
                        do_filter=False,
                        lowpass_filter_level=3,
-                       pdr_frequency=20,
-                       sampling_frequency=200):
-    # 1.计算mv,mh分量,得到[N][mv, mh]
+                       pdr_imu_align_size=10):
+    # 0. 检查不合理的pdr和imu的对齐参数
+    if pdr_imu_align_size < 1:
+        print("Wrong pdr_imu_align_size in samples_buffer_PDR")
+        return None
+
+    # 1.计算mv,mh分量：得到[N][mv, mh]
     arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
+
     # 2.滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波
     if do_filter:
         mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
         mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
         arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
 
-    # + 3.相比原来的samples_buffer()：
-    #    需要将原始高频arr_mv_mh 变为和 低频data_xy(pdr_xy) 对齐、平均后的和data_xy(PDR_xy)同频的arr_mv_mh
-    if sampling_frequency < pdr_frequency:
-        print("Wrong frequency in samples_buffer_PDR: sampling_frequency < PDR_frequency")
-        return None
-    if sampling_frequency % pdr_frequency != 0:
-        print("Wrong frequency in samples_buffer_PDR: sampling_frequency % PDR_frequency != 0")
-        return None
-
-    window_size = int(sampling_frequency / pdr_frequency)
-
-    arr_mv_mh_pdr = []
-    for i in range(0, len(PDR_xy)):
-        raw_i = i * window_size
-        window_start = raw_i - int(window_size / 2)
-        window_end = raw_i + int(window_size / 2)
-        if window_start < 0:
-            window_start = 0
-        if window_end > len(data_mag):
-            window_end = len(data_mag)
-        if window_start < window_end:
-            # ！注意错误数组访问下标写法：arr_mv_mh[window_start:window_end][0]
-            arr_mv_mh_pdr.append([np.mean(arr_mv_mh[window_start:window_end, 0]),
-                                  np.mean(arr_mv_mh[window_start:window_end, 1])])
+    # 3.对齐：将imu高频arr_mv_mh 变为和 低频pdr_xy 对齐、平均后的和PDR_xy 的arr_mv_mh
+    mv_mh_pdr_list = []
+    for pdr_i in range(0, len(pdr_xy)):
+        raw_i = pdr_i * pdr_imu_align_size
+        raw_i_start = raw_i - int(pdr_imu_align_size / 2)
+        raw_i_end = raw_i + int(pdr_imu_align_size / 2)
+        if raw_i_start < 0:
+            raw_i_start = 0
+        if raw_i_end > len(data_mag):
+            raw_i_end = len(data_mag)
+        if raw_i_start < raw_i_end:
+            mv_mh_pdr_list.append([np.mean(arr_mv_mh[raw_i_start:raw_i_end, 0]),
+                                  np.mean(arr_mv_mh[raw_i_start:raw_i_end, 1])])
         else:
             break
-    # PT.paint_signal(arr_mv_mh[:, 1], "Before align with PDR")
-    arr_mv_mh = np.array(arr_mv_mh_pdr)
-    # PT.paint_signal(arr_mv_mh[:, 1], "After align with PDR")
-    # + 相比原来的samples_buffer()  End
+    mv_mh_pdr_arr = np.array(mv_mh_pdr_list)
 
     # 4. for遍历PDR_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
+    # TODO 在这里实现滑动窗口，分离下采样和添加match_seq的逻辑！
+    #  IMU频率不是200，pdr频率也不是20，那怎么改？？
     i_start = 0
     i_mid = -1
     dis_sum_temp = 0
@@ -673,19 +665,19 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
     match_seq_list = []
     match_seq = []
     # 使用len(arr_mv_mh)，而不是 len(PDR_xy)，因为经过 3. 后，前者有可能小于后者
-    for i in range(1, len(arr_mv_mh)):
-        dis_sum_temp += math.hypot(PDR_xy[i][0] - PDR_xy[i - 1][0], PDR_xy[i][1] - PDR_xy[i - 1][1])
+    for i in range(1, len(mv_mh_pdr_arr)):
+        dis_sum_temp += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
         if dis_sum_temp >= down_sip_dis:
             # 当PDR仅两帧之间距离直接> down_sip_dis，则会导致连续进入该flow，使得 i_mid=-1
             if i_mid == -1:
                 i_mid = i_start
-            match_seq.append(down_sampling(i_start, i_mid, i, PDR_xy, arr_mv_mh))
+            match_seq.append(down_sampling(i_start, i_mid, i, pdr_xy, mv_mh_pdr_arr))
             i_start = i
             i_mid = -1
             dis_sum_all += dis_sum_temp
+            dis_sum_temp = 0
             # dis_sum_temp -= down_sip_dis 这样写虽然很真实，但会导致dis_sum_temp与i_mid_xy含义不一致，
             # 之前的会影响后续的，而且在dis_sum_all+= dis_sum_temp的时候会重复加上之前未清0的距离
-            dis_sum_temp = 0
         else:
             if i_mid == -1 and dis_sum_temp >= dis_mid:
                 i_mid = i
@@ -696,8 +688,7 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
             match_seq_list.append(match_seq.copy())
             match_seq.clear()
 
-    match_seq_list.append(match_seq)
-    # Don't change to numpy array at this time, because the len(match_seq) is different
+    match_seq_list.append(match_seq)  # Don't change to numpy array, because the len(match_seq) is different
     return match_seq_list
 
 
@@ -795,16 +786,18 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
                     last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
                     if search_pattern == SearchPattern.BREAKE_ADVANCED:
                         print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
-                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(loss_list) > 1 else 0
+                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
+                            loss_list) > 1 else 0
                         max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
                         print("\t\t.max mean loss sub = ", max_mean_sub_loss)
                         return transfer, map_xy
-                else:
+                else:  # loss > target and not out of map, continue try next transfer.
                     transfer = next_transfer
             else:
                 break
 
-        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(loss_list) > 1 else 0
+        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
+            loss_list) > 1 else 0
         max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
 
         if last_loss_xy_tf_num is not None:
@@ -924,6 +917,22 @@ def cal_grads_level_mag_vh(mag_map_grads):
 
     return grad_level_mv, grad_level_mh, grad_level_all
 
+
+def rebuild_map_from_mvh_files(mag_map_file_path):
+    if len(mag_map_file_path) != 2:
+        print("Need two files in rebuild_map_from_mvh_files()")
+        return None
+    mag_map_mv = np.array(np.loadtxt(mag_map_file_path[0], delimiter=','))
+    mag_map_mh = np.array(np.loadtxt(mag_map_file_path[1], delimiter=','))
+    mag_map = []
+    for i in range(0, len(mag_map_mv)):
+        temp = []
+        for j in range(0, len(mag_map_mv[0])):
+            temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
+        mag_map.append(temp)
+    mag_map = np.array(mag_map)
+
+    return mag_map
 
 # TODO 根据特征计算判断是否要使用当前transfer，这个经由卡尔曼滤波实现
 def trusted_mag_features():

@@ -19,8 +19,7 @@ TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 10 * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
-SAMPLE_FREQUENCY = 200  # 原始数据采样频率
-PDR_XY_FREQUENCY = 20  # PDR坐标输出频率
+PDR_IMU_ALIGN_SIZE = 10  # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
 TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)],  # 枚举transfers的参数，[0] = [△x, △y(米), △angle(弧度)]
                             [10, 10, 10]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
@@ -59,22 +58,17 @@ def main():
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
-    mag_map_mv = np.array(np.loadtxt(PATH_MAG_MAP[0], delimiter=','))
-    mag_map_mh = np.array(np.loadtxt(PATH_MAG_MAP[1], delimiter=','))
-    mag_map = []
-    for i in range(0, len(mag_map_mv)):
-        temp = []
-        for j in range(0, len(mag_map_mv[0])):
-            temp.append([mag_map_mv[i][j], mag_map_mh[i][j]])
-        mag_map.append(temp)
-    mag_map = np.array(mag_map)
+    mag_map = MMT.rebuild_map_from_mvh_files(PATH_MAG_MAP)
+    if mag_map is None:
+        print("Mag map rebuild failed!")
+        return
     PT.paint_heat_map(mag_map)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
     data_all = MMT.get_data_from_csv(PATH_PDR_RAW[1])
     iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
-    # 将iLocator_xy的坐标转换到MagMap中，作为Ground Truth
+    # 将iLocator_xy\pdr_xy的坐标平移到MagMap中
     MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
     MMT.change_axis(pdr_xy, MOVE_X, MOVE_Y)
     PT.paint_xy_list([iLocator_xy, pdr_xy], ['GT', 'PDR'], paint_map_size, ' ')
@@ -82,23 +76,23 @@ def main():
     data_quat = data_all[:, 7:11]
 
     match_seq_list = MMT.samples_buffer_PDR(
-        BUFFER_DIS, DOWN_SIP_DIS, data_quat, data_mag, pdr_xy,
+        BUFFER_DIS, DOWN_SIP_DIS,
+        data_quat, data_mag, pdr_xy,
         do_filter=True,
         lowpass_filter_level=EMD_FILTER_LEVEL,
-        pdr_frequency=PDR_XY_FREQUENCY,
-        sampling_frequency=SAMPLE_FREQUENCY,
+        pdr_imu_align_size=PDR_IMU_ALIGN_SIZE
     )  # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
+    if match_seq_list is None:
+        print("Get match seq list failed!")
+        return
 
-    # 3、根据匹配段进行迭代
+    # 3、迭代匹配段
     #  迭代结束情况：A：迭代out_of_map返回True；B：迭代次数超出阈值但last_loss仍未达标；C：迭代last_loss小于阈值。AB表示匹配失败
-
     #   3.1 给初始transfer
     transfer = ORIGINAL_START_TRANSFER
 
     #    3.2 基于初始匹配进行迭代
     map_xy_list = []
-    # TODO 收集评估参数，并绘制折线图？如何绘制，查找什么之间的关系？
-
     for i in range(0, len(match_seq_list)):
         print("\nMatch Seq {0} :".format(i))
         match_seq = np.array(match_seq_list[i])  # 待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
@@ -168,9 +162,9 @@ def main():
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
         # 计算轨迹距离
         distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-            iLocator_xy, map_xy_with_index, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+            iLocator_xy, map_xy_with_index, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
         distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-            iLocator_xy, raw_xy_with_index, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+            iLocator_xy, raw_xy_with_index, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
         mean_distance_between_MagPDR_GT = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
         mean_distance_between_PDR_GT = np.mean(distance_of_PDR_iLocator_points[:, 0])
         improvement = mean_distance_between_PDR_GT - mean_distance_between_MagPDR_GT
@@ -200,20 +194,20 @@ def main():
     pdr_xy = MMT.transfer_axis_of_xy_seq(pdr_xy, ORIGINAL_START_TRANSFER)
     # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
-        iLocator_xy, pdr_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+        iLocator_xy, pdr_xy, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
     # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-        iLocator_xy, magPDR_xy, SAMPLE_FREQUENCY, PDR_XY_FREQUENCY)
+        iLocator_xy, magPDR_xy, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
-    # print("distance_of_PDR_iLocator_points:\n", distance_of_PDR_iLocator_points)
     mean_distance = np.mean(distance_of_PDR_iLocator_points[:, 0])
     print("\tMean Distance between PDR and GT: ", mean_distance)
+
     # 5.2 打印MagPDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
-    # print("distance_of_MagPDR_iLocator_points:\n", distance_of_MagPDR_iLocator_points)
     mean_distance = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
     print("\tMean Distance between MagPDR and GT: ", mean_distance)
+
     # 5.3 对Ground Truth(iLocator)、PDR、MagPDR进行绘图
     PT.paint_xy_list([iLocator_xy], ["GT by iLocator"], paint_map_size, ' ')
     PT.paint_xy_list([pdr_xy], ["PDR"], paint_map_size, ' ')

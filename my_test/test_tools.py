@@ -20,19 +20,15 @@ def get_time_in_second():
 # 输入：iLocator xy，坐标系变换后的PDR xy，iLocator频率，PDR频率
 # 返回：distance_and_PDR_iLocator_points[N][5]：保存距离和坐标
 # 外层计算平均距离，则使用 np.mean(arr[:, 0], axis=0)即可。
-def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, iLocator_frequency, PDR_frequency):
-    if iLocator_frequency < PDR_frequency:
-        print("Wrong frequency in cal_distance_between_iLocator_and_MagPDR: iLocator_frequency < PDR_frequency")
-        return None
-    if iLocator_frequency % PDR_frequency != 0:
-        print("Wrong frequency in cal_distance_between_iLocator_and_MagPDR: iLocator_frequency % PDR_frequency != 0")
+def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, pdr_imu_align_size=10):
+    if pdr_imu_align_size < 1:
+        print("Wrong pdr_imu_align_size in cal_distance_between_iLocator_and_PDR")
         return None
 
-    step = iLocator_frequency // PDR_frequency
     distance_and_PDR_iLocator_points = []
 
     for i in range(0, len(PDR_xy)):
-        j = i * step
+        j = i * pdr_imu_align_size
         # NOTE: 全是深拷贝，非地址拷贝
         distance_and_PDR_iLocator_points.append([cal_distance(PDR_xy[i], iLocator_xy[j]),
                                                  PDR_xy[i][0], PDR_xy[i][1],
@@ -45,23 +41,19 @@ def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, iLocator_frequenc
 # 输入：iLocator xy，带下标信息的MagPDR xy[N][x, y, PDR_xy_index]，iLocator频率，PDR频率
 # 返回：distance_and_PDR_iLocator_points[N][5]：保存距离和坐标
 # 外层计算平均距离，则使用 np.mean(arr[:, 0], axis=0)即可。
-def cal_distance_between_iLocator_and_MagPDR(iLocator_xy, MagPDR_xy, iLocator_frequency, PDR_frequency):
-    if iLocator_frequency < PDR_frequency:
-        print("Wrong frequency in cal_distance_between_iLocator_and_MagPDR: iLocator_frequency < PDR_frequency")
-        return None
-    if iLocator_frequency % PDR_frequency != 0:
-        print("Wrong frequency in cal_distance_between_iLocator_and_MagPDR: iLocator_frequency % PDR_frequency != 0")
+def cal_distance_between_iLocator_and_MagPDR(iLocator_xy, map_xy_with_index, pdr_imu_align_size=10):
+    if pdr_imu_align_size < 1:
+        print("Wrong pdr_imu_align_size in cal_distance_between_iLocator_and_MagPDR")
         return None
 
-    step = iLocator_frequency // PDR_frequency
     distance_and_PDR_iLocator_points = []
-
-    for i in range(0, len(MagPDR_xy)):
-        j = int(MagPDR_xy[i][2] * step)
+    for i in range(0, len(map_xy_with_index)):
+        map_pdr_xy_index = map_xy_with_index[i][2]
+        iLocator_xy_index = int(map_pdr_xy_index * pdr_imu_align_size)
         # NOTE: 全是深拷贝，非地址拷贝
-        distance_and_PDR_iLocator_points.append([cal_distance(MagPDR_xy[i], iLocator_xy[j]),
-                                                 MagPDR_xy[i][0], MagPDR_xy[i][1],
-                                                 iLocator_xy[j][0], iLocator_xy[j][1]])
+        distance_and_PDR_iLocator_points.append([cal_distance(map_xy_with_index[i], iLocator_xy[iLocator_xy_index]),
+                                                 map_xy_with_index[i][0], map_xy_with_index[i][1],
+                                                 iLocator_xy[iLocator_xy_index][0], iLocator_xy[iLocator_xy_index][1]])
     return np.array(distance_and_PDR_iLocator_points)
 
 
