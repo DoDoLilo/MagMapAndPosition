@@ -5,17 +5,19 @@ import my_test.test_tools as TEST
 import paint_tools as PT
 
 # -----------地图系统参数------------------
-MOVE_X = 25.  # iLocator真值坐标平移参数
+MOVE_X = 25.  # iLocator真值坐标平移参数（m）
 MOVE_Y = 12.
-MAP_SIZE_X = 58.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
+MAP_SIZE_X = 58.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（m）
 MAP_SIZE_Y = 16.
-BLOCK_SIZE = 0.25  # 地图块大小
+BLOCK_SIZE = 0.25  # 地图块大小，（m）
 EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
-BUFFER_DIS = 5  # 缓冲池大小，单位（m）
-DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度，应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
+BUFFER_DIS = 5  # 缓冲池大小（m）
+DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
 # --------迭代搜索参数----------------------
+SLIDE_STEP = 4  # 滑动窗口步长
+SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 90  # 高斯牛顿最大迭代次数
-TARGET_LOSS = BUFFER_DIS / BLOCK_SIZE * 10  # 目标损失
+TARGET_MEAN_LOSS = 10  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 10 * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
@@ -25,9 +27,9 @@ TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)],  # 枚举transfers�
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 # ---------数据文件路径---------------------------
 # 607-1
-PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
+# PATH_PDR_RAW = [
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv.npy",
+#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
 #
 # 607-2
 # PATH_PDR_RAW = [
@@ -40,9 +42,9 @@ PATH_PDR_RAW = [
 #     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
 #
 # 607-4
-# PATH_PDR_RAW = [
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
 PATH_MAG_MAP = [
@@ -54,7 +56,7 @@ PATH_MAG_MAP = [
 def main():
     paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
     print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
-    print("TARGET_LOSS:", TARGET_LOSS)
+    print("TARGET_MEAN_LOSS:", TARGET_MEAN_LOSS)
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
@@ -62,7 +64,7 @@ def main():
     if mag_map is None:
         print("Mag map rebuild failed!")
         return
-    PT.paint_heat_map(mag_map)
+    # PT.paint_heat_map(mag_map)
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
@@ -75,13 +77,16 @@ def main():
     data_mag = data_all[:, 21:24]
     data_quat = data_all[:, 7:11]
 
-    match_seq_list = MMT.samples_buffer_PDR(
+    match_seq_list, slide_number_list = MMT.samples_buffer_with_pdr_and_slidewindow(
         BUFFER_DIS, DOWN_SIP_DIS,
         data_quat, data_mag, pdr_xy,
         do_filter=True,
         lowpass_filter_level=EMD_FILTER_LEVEL,
-        pdr_imu_align_size=PDR_IMU_ALIGN_SIZE
+        pdr_imu_align_size=PDR_IMU_ALIGN_SIZE,
+        slide_step=SLIDE_STEP,
+        slide_block_size=SLIDE_BLOCK_SIZE
     )  # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
+
     if match_seq_list is None:
         print("Get match seq list failed!")
         return
@@ -103,9 +108,12 @@ def main():
         transfer, map_xy = MMT.produce_transfer_candidates_and_search(start_transfer, TRANSFERS_PRODUCE_CONFIG,
                                                                       match_seq, mag_map,
                                                                       BLOCK_SIZE, STEP, MAX_ITERATION,
-                                                                      TARGET_LOSS,
+                                                                      TARGET_MEAN_LOSS,
                                                                       UPPER_LIMIT_OF_GAUSSNEWTEON,
                                                                       MMT.SearchPattern.BREAKE_ADVANCED)
+        # 修改每个滑动窗口的实际生效坐标数量
+        map_xy = map_xy[0: slide_number_list[i]]
+        match_seq = match_seq[0: slide_number_list[i]]
         map_xy_list.append(map_xy)
 
         # 2.如果找到新的transfer，则计算指纹库的磁场特征
@@ -183,8 +191,8 @@ def main():
             final_xy.append(xy)
     final_xy = np.array(final_xy)
     # 4.2 还原每个xy对应的原PDR中的下标index
-    for match_seq in match_seq_list:
-        for p in match_seq:
+    for i in range(0, len(match_seq_list)):
+        for p in match_seq_list[i][0: slide_number_list[i]]:
             final_index.append(p[4])
     # 4.3 将final_xy与final_index合并为MagPDR_xy（合并前要先在final_index的列上增加维度，让其由1维变为N×1的二维数组）
     final_index = np.array(final_index)
@@ -215,7 +223,7 @@ def main():
                      ['MagPDR'],
                      paint_map_size,
                      "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
-                     .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_LOSS)
+                     .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_MEAN_LOSS)
                      )
     PT.paint_xy_list([iLocator_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines")
     return

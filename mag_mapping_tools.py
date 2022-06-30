@@ -7,6 +7,7 @@ from PyEMD import EMD
 from dtaidistance import dtw
 from scipy.spatial.transform import Rotation
 import paint_tools as PT
+import queue
 
 
 # 读csv文件所有列，返回指定列：输入：文件路径，返回：指定列数组numpy.ndarray
@@ -44,12 +45,12 @@ def lowpass_emd(data_magnitude, cut_off):
 
 
 # 对地磁强度进行一次指定factor的下采样，输入：一维磁强数组，factor，返回：处理后的一维磁强数组
-def down_sampling_by_mean(data, factor):
-    data_down = []
-    # 舍弃最末尾无法凑成一个Factor的数据
-    for i in range(0, len(data) - factor + 1, factor):
-        data_down.append(np.mean(data[i:i + factor]))
-    return np.array(data_down)
+# def down_sampling_by_mean(data, factor):
+#     data_down = []
+#     # 舍弃最末尾无法凑成一个Factor的数据
+#     for i in range(0, len(data) - factor + 1, factor):
+#         data_down.append(np.mean(data[i:i + factor]))
+#     return np.array(data_down)
 
 
 def cal_length(x):
@@ -341,7 +342,7 @@ def samples_buffer(buffer_dis, down_sip_dis, data_quat, data_mag, data_xy,
 # NOTE: 重采样前是要先进行mvh计算的，因为计算mvh和对应的quat_ori相关，而角度不能平均，显然不能平均后再计算mvh。
 # 实现：按累积距离下采样：假设为0.3m，则0.15m处x,y的磁强 = 0.0 ~ 0.3m的磁强平均（坐标不能平均）
 # 输入：下采样窗口下标start,mid,end，采集的匹配序列[x, y, mv, mh]
-# 输出：稀疏的 位置-磁场 序列[x, y, mmv, mmh]
+# 输出：稀疏的 位置-磁场 序列[pdr_x, pdr_y, mmv, mmh, pdr_xy_index]
 def down_sampling(i_start, i_mid, i_end, data_xy, arr_mv_mh):
     mmv = np.mean(arr_mv_mh[i_start:i_end, 0])
     mmh = np.mean(arr_mv_mh[i_start:i_end, 1])
@@ -478,15 +479,17 @@ def cal_loss(mag_arr_1, mag_arr_2):
 
 # 对cal_loss()的优化：
 # 将地磁序列减去其均值后再计算残差，认为 相同形状、不同模值 的俩序列的匹配度应该更高(loss更小)。
-def cal_loss_2(mag_arr_1, mag_arr_2):
+def cal_mean_loss(mag_arr_1, mag_arr_2):
     s = 0
     mv_arr_1 = remove_mean(mag_arr_1[:, 0])
     mh_arr_1 = remove_mean(mag_arr_1[:, 1])
     mv_arr_2 = remove_mean(mag_arr_2[:, 0])
     mh_arr_2 = remove_mean(mag_arr_2[:, 1])
+    num = 0
     for mv_1, mh_1, mv_2, mh_2 in zip(mv_arr_1, mh_arr_1, mv_arr_2, mh_arr_2):
+        num += 1
         s += (mv_1 - mv_2) ** 2 + (mh_1 - mh_2) ** 2
-    return s
+    return s / num
 
 
 # 高斯牛顿迭代法，实现论文公式4.11 4.12
@@ -549,7 +552,7 @@ def cal_new_transfer_and_last_loss_xy(transfer, sparse_pdr_xy_mvh, mag_map, bloc
     mag_map_grads = np.array(mag_map_grads)
 
     # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
-    loss = cal_loss_2(pdr_mvh, map_mvh) if not out_of_map else None
+    loss = cal_mean_loss(pdr_mvh, map_mvh) if not out_of_map else None
 
     # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step计算 _transfer
     new_transfer = transfer.copy()
@@ -617,7 +620,6 @@ def get_PDR_xy_align_mag_quat(pdr_xy, raw_mag, raw_quat, pdr_frequency=20, sampl
 #     + data_xy变为频率不同的PDR_xy，+ PDR轨迹频率pdr_frequency=20, angles/mag采样频率sampling_frequency=200
 # 输出：多条匹配序列[?][M][x,y, mv, mh, PDRindex]
 # 平均：当频率为200与20时，PDR_x,y[i]对应的地磁 = mean( raw_data[ i*10-5 : i*10 + 5] ); 不包括 +5。
-# TODO : 额外返回一个 list 记录每个滑动窗口对应的 坐标个数
 def samples_buffer_PDR(buffer_dis, down_sip_dis,
                        data_quat, data_mag, pdr_xy,
                        do_filter=False,
@@ -649,16 +651,14 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
             raw_i_end = len(data_mag)
         if raw_i_start < raw_i_end:
             mv_mh_pdr_list.append([np.mean(arr_mv_mh[raw_i_start:raw_i_end, 0]),
-                                  np.mean(arr_mv_mh[raw_i_start:raw_i_end, 1])])
+                                   np.mean(arr_mv_mh[raw_i_start:raw_i_end, 1])])
         else:
             break
     mv_mh_pdr_arr = np.array(mv_mh_pdr_list)
 
     # 4. for遍历PDR_xy，计算距离，达到down_sip_dis/2记录 i_mid，达到 down_sip_dis记录 i_end并计算down_sampling
-    # TODO 在这里实现滑动窗口，分离下采样和添加match_seq的逻辑！
-    #  IMU频率不是200，pdr频率也不是20，那怎么改？？
     i_start = 0
-    i_mid = -1
+    i_mid = i_start
     dis_sum_temp = 0
     dis_sum_all = 0
     dis_mid = down_sip_dis / 2
@@ -666,30 +666,158 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
     match_seq = []
     # 使用len(arr_mv_mh)，而不是 len(PDR_xy)，因为经过 3. 后，前者有可能小于后者
     for i in range(1, len(mv_mh_pdr_arr)):
-        dis_sum_temp += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
+        dis_increment = math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
+        dis_sum_temp += dis_increment
+        dis_sum_all += dis_increment
         if dis_sum_temp >= down_sip_dis:
-            # 当PDR仅两帧之间距离直接> down_sip_dis，则会导致连续进入该flow，使得 i_mid=-1
-            if i_mid == -1:
-                i_mid = i_start
             match_seq.append(down_sampling(i_start, i_mid, i, pdr_xy, mv_mh_pdr_arr))
             i_start = i
-            i_mid = -1
-            dis_sum_all += dis_sum_temp
+            i_mid = i_start
             dis_sum_temp = 0
             # dis_sum_temp -= down_sip_dis 这样写虽然很真实，但会导致dis_sum_temp与i_mid_xy含义不一致，
             # 之前的会影响后续的，而且在dis_sum_all+= dis_sum_temp的时候会重复加上之前未清0的距离
         else:
-            if i_mid == -1 and dis_sum_temp >= dis_mid:
+            if dis_sum_temp >= dis_mid:
                 i_mid = i
 
         if dis_sum_all >= buffer_dis:
             # dis_sum_all -= buffer_dis 这样写，之前的会影响后续的
             dis_sum_all = 0
-            match_seq_list.append(match_seq.copy())
+            match_seq_list.append(np.array(match_seq))
             match_seq.clear()
 
     match_seq_list.append(match_seq)  # Don't change to numpy array, because the len(match_seq) is different
     return match_seq_list
+
+
+# TEST 测试slide_dis == buffer_dis时（退化为无滑动窗口），本方法与方法[samples_buffer_PDR]结果不同的原因：
+#     由于本方法下采样与填充buffer的逻辑分离，在计算缓冲池距离增量时，本方法的距离增加粒度是下采样后的粒度。
+#     而方法[samples_buffer_PDR]中，下采样与填充buffer的逻辑同时进行，buffer距离增加粒度是下采样前的粒度。
+#     所以方法[samples_buffer_PDR]的buffer距离增量可能会比本方法先一步达到buffer_dis，导致len(match_seq)不一致（本方法可能多1）
+def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
+                                            data_quat, data_mag, pdr_xy,
+                                            do_filter=False,
+                                            lowpass_filter_level=3,
+                                            pdr_imu_align_size=10,
+                                            slide_step=2,
+                                            slide_block_size=0.25):
+    # 0. 检查不合理参数（非完全检查）
+    if pdr_imu_align_size < 1:
+        print("*Error: Wrong pdr_imu_align_size [samples_buffer_with_pdr_and_slidewindow]")
+        return None
+
+    slide_dis = slide_step * slide_block_size  # 每次滑窗的距离
+    if slide_dis > buffer_dis:  # 窗口滑动的距离大于窗口本身
+        print("*Error: slide distance {0} is longer than buffer distance {1} [samples_buffer_with_pdr_and_slidewindow]"
+              .format(slide_dis, buffer_dis))
+        return None
+
+    # 1.计算mv,mh分量：得到[N][mv, mh]
+    arr_mv_mh_mm = get_2d_mag_qiu(data_quat, data_mag)
+
+    # 2.滤波：对匹配序列中的地磁进行滤波，在下采样之前滤波，下采样之后太短了不能滤波
+    if do_filter:
+        mv_filtered_emd = lowpass_emd(arr_mv_mh_mm[:, 0], lowpass_filter_level)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh_mm[:, 1], lowpass_filter_level)
+        arr_mv_mh_mm = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+
+    # 3.对齐：将imu高频arr_mv_mh 变为和 低频pdr_xy 对齐、平均后的和PDR_xy 的arr_mv_mh
+    mv_mh_aligen_to_pdr = []
+    for pdr_i in range(0, len(pdr_xy)):
+        raw_i = pdr_i * pdr_imu_align_size
+        raw_i_start = raw_i - int(pdr_imu_align_size / 2)
+        raw_i_end = raw_i + int(pdr_imu_align_size / 2)
+        if raw_i_start < 0:
+            raw_i_start = 0
+        if raw_i_end > len(data_mag):
+            raw_i_end = len(data_mag)
+        if raw_i_start < raw_i_end:
+            # 这里只用了mv和mh
+            mv_mh_aligen_to_pdr.append([np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 0]),
+                                        np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 1])])
+        else:
+            break
+    arr_mv_mh_aligen_to_pdr = np.array(mv_mh_aligen_to_pdr)
+
+    # 4. 下采样，获取下采样后的 位置-磁场 序列[N3][pdr_x, pdr_y, mmv, mmh, pdr_xy_index]
+    xy_mvh_downsampled_list = []
+    dis_sum_temp = 0
+    i_start = 0
+    i_mid = i_start
+    mid_downsampling_dis = downsampling_dis / 2
+    # 使用len(arr_mv_mh_aligen_to_pdr)，而不是len(PDR_xy)，因为经过3.后:前者有可能<后者
+    for i in range(1, len(arr_mv_mh_aligen_to_pdr)):
+        # 当累计距离达到downsampling_dis就执行下采样，添加到pdr_xy_mag_vh_list
+        dis_sum_temp += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
+        if dis_sum_temp >= downsampling_dis:
+            xy_mvh_downsampled_list.append(down_sampling(i_start, i_mid, i, pdr_xy, arr_mv_mh_aligen_to_pdr))
+            dis_sum_temp = 0
+            i_start = i
+            i_mid = i_start
+        else:
+            if dis_sum_temp >= mid_downsampling_dis:
+                i_mid = i
+
+    # 5. 对 xy_mvh_downsampled_list 进行滑动窗口产生匹配段match_seq_list
+    window_buffer = []  # 保存一个距离窗口的[pdr_x, pdr_y, mmv, mmh, pdr_xy_index]
+    slide_number_queue = queue.Queue()  # 提前保存每个滑窗对应的数据个数
+    slide_dis_queue = queue.Queue()  # 保存滑动的距离
+    dis_sum_buffer = 0  # 保存当前窗口累计距离，达到buffer_dis清0
+    dis_sum_silde = 0  # 保存当前滑动累计距离，达到slide_dis清0
+    match_seq_list = []  # 返回给外层的、保存所有待匹配的窗口
+    slide_number_list = []  # 返回给外层的、和match_seq_list中的每个match_seq对应的
+
+    # 先填满一个窗口，装入match_seq_list
+    index = 0
+    last_slide_index = -1  # 上一次记录滑窗的下标，注意初值-1
+    window_buffer.append(xy_mvh_downsampled_list[index])
+    index += 1
+    while dis_sum_buffer < buffer_dis:
+        if index >= len(xy_mvh_downsampled_list):  # 如果整个轨迹都达不到一个窗口
+            print("*Error: the whole distance is too short [samples_buffer_with_pdr_and_slidewindow]")
+            return None
+
+        dis_increment = math.hypot(xy_mvh_downsampled_list[index][0] - xy_mvh_downsampled_list[index - 1][0],
+                                   xy_mvh_downsampled_list[index][1] - xy_mvh_downsampled_list[index - 1][1])
+        dis_sum_silde += dis_increment
+        dis_sum_buffer += dis_increment
+        window_buffer.append(xy_mvh_downsampled_list[index])
+        # 此if要放在dis增加的后面，否则当最后一次循环时dis_sum_silde达到slide_dis时不会进入该判断
+        if dis_sum_silde >= slide_dis:
+            slide_number_queue.put(index - last_slide_index)
+            slide_dis_queue.put(dis_sum_silde)
+            dis_sum_silde = 0
+            last_slide_index = index
+        index += 1  # 注意该操作不能放在if前
+
+    match_seq_list.append(np.array(window_buffer))
+    slide_number = slide_number_queue.get()
+    slide_number_list.append(slide_number)
+    del window_buffer[0: slide_number]  # 删除窗口头部滑动数据，代表滑动窗口
+    dis_sum_buffer -= slide_dis_queue.get()  # 窗口滑动（舍弃）的距离
+
+    # 继续滑动窗口
+    for index_2 in range(index, len(xy_mvh_downsampled_list)):
+        dis_increment = math.hypot(xy_mvh_downsampled_list[index_2][0] - xy_mvh_downsampled_list[index_2 - 1][0],
+                                   xy_mvh_downsampled_list[index_2][1] - xy_mvh_downsampled_list[index_2 - 1][1])
+        dis_sum_silde += dis_increment
+        dis_sum_buffer += dis_increment
+        window_buffer.append(xy_mvh_downsampled_list[index_2])
+
+        if dis_sum_silde >= slide_dis:
+            slide_number_queue.put(index_2 - last_slide_index)
+            slide_dis_queue.put(dis_sum_silde)
+            dis_sum_silde = 0
+            last_slide_index = index_2
+
+        if dis_sum_buffer >= buffer_dis:
+            match_seq_list.append(np.array(window_buffer))
+            slide_number = slide_number_queue.get()
+            slide_number_list.append(slide_number)
+            del window_buffer[0: slide_number]
+            dis_sum_buffer -= slide_dis_queue.get()
+
+    return match_seq_list, slide_number_list
 
 
 # 候选transfer向量生成器：
@@ -933,6 +1061,7 @@ def rebuild_map_from_mvh_files(mag_map_file_path):
     mag_map = np.array(mag_map)
 
     return mag_map
+
 
 # TODO 根据特征计算判断是否要使用当前transfer，这个经由卡尔曼滤波实现
 def trusted_mag_features():
