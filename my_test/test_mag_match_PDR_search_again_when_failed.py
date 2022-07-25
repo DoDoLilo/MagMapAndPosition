@@ -57,6 +57,8 @@ def main():
     paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
     print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
     print("TARGET_MEAN_LOSS:", TARGET_MEAN_LOSS)
+    print("BUFFER_DIS", BUFFER_DIS)
+    print("Slide distance", SLIDE_STEP * SLIDE_BLOCK_SIZE)
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
