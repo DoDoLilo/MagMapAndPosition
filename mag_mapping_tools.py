@@ -202,13 +202,13 @@ def change_axis(arr_x_y_gt, move_x, move_y):
 # 输入：原始csv文件路径file_paths
 # 输出：栅格化的地磁双分量数组 TODO: 增加磁强总量
 # 实现：①根据路径读取数组；②将多个文件的{地磁、方向、xyGT}连接为一个数组后进行建库。
-def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y,
-                       time_thr=-1,
-                       radius=1,
-                       block_size=0.3,
-                       delete_extra_blocks=False, delete_level=0,
-                       lowpass_filter_level=3
-                       ):
+def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, map_size_y,
+                                       time_thr=-1,
+                                       radius=1,
+                                       block_size=0.3,
+                                       delete_extra_blocks=False, delete_level=0,
+                                       lowpass_filter_level=3
+                                       ):
     if len(file_paths) == 0:
         return None
 
@@ -242,6 +242,59 @@ def build_map_by_files(file_paths, move_x, move_y, map_size_x, map_size_y,
     return rast_mv_mh
 
 
+# 1. 相比build_map_by_files_and_ilocator_xy，使用的是经过打点较准后的marked_pdr_xy，
+# 2. 且pdr坐标和imu数据分开输入，所以需要对齐后使用.
+# 3. 因为是已经被打点较准的pdr，所以不需要再平移到地图坐标系.
+def build_map_by_files_and_marked_pdr_xy(file_paths,
+                                         map_size_x, map_size_y,
+                                         time_thr=-1,
+                                         radius=1,
+                                         block_size=0.3,
+                                         delete_extra_blocks=False, delete_level=0,
+                                         lowpass_filter_level=3,
+                                         pdr_imu_align_size=10,
+                                         fig_save_dir=None
+                                         ):
+    if len(file_paths) == 0:
+        return None
+
+    # 先获取mag\quat计算mv_mh，先滤波，再和pdr_xy对齐
+    data_imu = get_data_from_csv(file_paths[0][0])
+    data_mag = data_imu[:, 7:10]
+    data_quat = data_imu[:, 10:14]
+    arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
+    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
+    arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+    pdr_xy = get_data_from_csv(file_paths[0][1])
+    arr_mv_mh_aligned = align_mv_mh_to_pdr(arr_mv_mh, pdr_xy, pdr_imu_align_size)
+    mv_mh_pdr_xy = np.hstack((arr_mv_mh_aligned, pdr_xy))
+
+    for i in range(1, len(file_paths)):
+        data_imu = get_data_from_csv(file_paths[i][0])
+        data_mag = data_imu[:, 7:10]
+        data_quat = data_imu[:, 10:14]
+        arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
+        mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+        mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
+        arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+        pdr_xy = get_data_from_csv(file_paths[i][1])
+        arr_mv_mh_aligned = align_mv_mh_to_pdr(arr_mv_mh, pdr_xy, pdr_imu_align_size)
+        mv_mh_pdr_xy = np.vstack((mv_mh_pdr_xy, np.hstack((arr_mv_mh_aligned, pdr_xy))))
+
+    # 栅格化
+    rast_mv_mh = build_rast_mv_mh(mv_mh_pdr_xy[:, 0:2], mv_mh_pdr_xy[:, 2:4], map_size_x, map_size_y, block_size)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir+'/no_inter' if fig_save_dir is not None else None)
+    # 内插填补
+    rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
+    inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    # PT.paint_heat_map(rast_mv_mh, fill_num)
+    if delete_extra_blocks:
+        delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir+'/intered' if fig_save_dir is not None else None)
+    return rast_mv_mh
+
+
 # 循环调用内插填补
 # 输入:栅格化rast_mv_mh，循环次数上限time_threshold(-1则循环直到不存在新增块),填补半径radius,块大小block_size
 # 输出：内插填补的次数 num
@@ -264,8 +317,8 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
         return
     copy_rast_raw = np.copy(rast_mv_mh_raw)
     far_most = int(radius / math.sqrt(2 * block_size ** 2)) - delete_level
-    if far_most < 1:
-        far_most = 1
+    if far_most < 0:
+        far_most = 0
     # 2
     len_1 = len(rast_mv_mh_raw)
     len_2 = len(rast_mv_mh_raw[0])
@@ -721,23 +774,8 @@ def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
         mh_filtered_emd = lowpass_emd(arr_mv_mh_mm[:, 1], lowpass_filter_level)
         arr_mv_mh_mm = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
 
-    # 3.对齐：将imu高频arr_mv_mh 变为和 低频pdr_xy 对齐、平均后的和PDR_xy 的arr_mv_mh
-    mv_mh_aligen_to_pdr = []
-    for pdr_i in range(0, len(pdr_xy)):
-        raw_i = pdr_i * pdr_imu_align_size
-        raw_i_start = raw_i - int(pdr_imu_align_size / 2)
-        raw_i_end = raw_i + int(pdr_imu_align_size / 2)
-        if raw_i_start < 0:
-            raw_i_start = 0
-        if raw_i_end > len(data_mag):
-            raw_i_end = len(data_mag)
-        if raw_i_start < raw_i_end:
-            # 这里只用了mv和mh
-            mv_mh_aligen_to_pdr.append([np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 0]),
-                                        np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 1])])
-        else:
-            break
-    arr_mv_mh_aligen_to_pdr = np.array(mv_mh_aligen_to_pdr)
+    # 3.对齐：将imu高频arr_mv_mh 变为和 低频pdr_xy 对齐、平均后的arr_mv_mh
+    arr_mv_mh_aligned_to_pdr = align_mv_mh_to_pdr(arr_mv_mh_mm, pdr_xy, pdr_imu_align_size)
 
     # 4. 下采样，获取下采样后的 位置-磁场 序列[N3][pdr_x, pdr_y, mmv, mmh, pdr_xy_index]
     xy_mvh_downsampled_list = []
@@ -745,12 +783,12 @@ def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
     i_start = 0
     i_mid = i_start
     mid_downsampling_dis = downsampling_dis / 2
-    # 使用len(arr_mv_mh_aligen_to_pdr)，而不是len(PDR_xy)，因为经过3.后:前者有可能<后者
-    for i in range(1, len(arr_mv_mh_aligen_to_pdr)):
+    # 使用len(arr_mv_mh_aligned_to_pdr)，而不是len(PDR_xy)，因为经过3.后:前者有可能<后者
+    for i in range(1, len(arr_mv_mh_aligned_to_pdr)):
         # 当累计距离达到downsampling_dis就执行下采样，添加到pdr_xy_mag_vh_list
         dis_sum_temp += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
         if dis_sum_temp >= downsampling_dis:
-            xy_mvh_downsampled_list.append(down_sampling(i_start, i_mid, i, pdr_xy, arr_mv_mh_aligen_to_pdr))
+            xy_mvh_downsampled_list.append(down_sampling(i_start, i_mid, i, pdr_xy, arr_mv_mh_aligned_to_pdr))
             dis_sum_temp = 0
             i_start = i
             i_mid = i_start
@@ -818,6 +856,29 @@ def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
             dis_sum_buffer -= slide_dis_queue.get()
 
     return match_seq_list, slide_number_list
+
+
+# 将高频的磁场指纹平均对齐到pdr坐标
+# 输入：通过get_2d_mag_qiu()返回的磁场分量arr_mv_mh_mm，低频pdr轨迹pdr_xy，pdr滑动窗口大小pdr_imu_align_size
+# 返回：[len(pdr_xy)][mv, mh]
+def align_mv_mh_to_pdr(arr_mv_mh_mm, pdr_xy, pdr_imu_align_size):
+    mv_mh_aligned_to_pdr = []
+    for pdr_i in range(0, len(pdr_xy)):
+        raw_i = pdr_i * pdr_imu_align_size
+        raw_i_start = raw_i - int(pdr_imu_align_size / 2)
+        raw_i_end = raw_i + int(pdr_imu_align_size / 2)
+        if raw_i_start < 0:
+            raw_i_start = 0
+        if raw_i_end > len(arr_mv_mh_mm):
+            raw_i_end = len(arr_mv_mh_mm)
+        if raw_i_start < raw_i_end:
+            # 这里只用了mv和mh
+            mv_mh_aligned_to_pdr.append([np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 0]),
+                                         np.mean(arr_mv_mh_mm[raw_i_start:raw_i_end, 1])])
+        else:
+            break
+    arr_mv_mh_aligned_to_pdr = np.array(mv_mh_aligned_to_pdr)
+    return arr_mv_mh_aligned_to_pdr
 
 
 # 候选transfer向量生成器：

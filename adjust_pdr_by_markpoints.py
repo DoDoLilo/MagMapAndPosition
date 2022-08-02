@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import math
 import paint_tools as pt
@@ -40,19 +42,58 @@ def transfer_axis(transfer, x0, y0):
 
 # 根据打点坐标调整PDR轨迹
 # 0.输入3个文件，原始IMU文件、通过AI_PDR程序获得的.npy文件、打点文件
+# path_list = [
+#     # IMU文件：时间戳，加速度，陀螺仪，磁力计，四元数
+#     "./data/server room test/mag map build/2/TEST_2022-07-28-145643_sensors.csv",
+#     # PDR坐标文件：x,y
+#     "./data/server room test/mag map build/2/TEST_2022-07-28-145643_sensors.csv.npy",
+#     # 打点文件：时间戳，x,y
+#     "./data/server room test/mag map build/2/TEST_2022-07-28-145643_points.csv"
+# ]
+
+# path_list = [
+#     # IMU文件：时间戳，加速度，陀螺仪，磁力计，四元数
+#     "./data/server room test/mag map build/3/TEST_2022-07-28-145932_sensors.csv",
+#     # PDR坐标文件：x,y
+#     "./data/server room test/mag map build/3/TEST_2022-07-28-145932_sensors.csv.npy",
+#     # 打点文件：时间戳，x,y
+#     "./data/server room  test/mag map build/3/TEST_2022-07-28-145932_points.csv"
+# ]
+#
+# path_list = [
+#     # IMU文件：时间戳，加速度，陀螺仪，磁力计，四元数
+#     "./data/server room test/mag map build/4/TEST_2022-07-28-150211_sensors.csv",
+#     # PDR坐标文件：x,y
+#     "./data/server room test/mag map build/4/TEST_2022-07-28-150211_sensors.csv.npy",
+#     # 打点文件：时间戳，x,y
+#     "./data/server room test/mag map build/4/TEST_2022-07-28-150211_points.csv"
+# ]
+
 path_list = [
     # IMU文件：时间戳，加速度，陀螺仪，磁力计，四元数
-    "C:\\Users\\14799\\OneDrive - whu.edu.cn\\桌面\\test\\TEST_2022-07-25-101613_sensors.csv",
+    "./data/server room test/mag map build/5/TEST_2022-07-28-150518_sensors.csv",
     # PDR坐标文件：x,y
-    "C:\\Users\\14799\\OneDrive - whu.edu.cn\\桌面\\test\\TEST_2022-07-25-101613_sensors.csv.npy",
+    "./data/server room test/mag map build/5/TEST_2022-07-28-150518_sensors.csv.npy",
     # 打点文件：时间戳，x,y
-    "C:\\Users\\14799\\OneDrive - whu.edu.cn\\桌面\\test\\TEST_2022-07-25-101613_points.csv"
+    "./data/server room test/mag map build/5/TEST_2022-07-28-150518_points.csv"
 ]
 
-file_save_path = "C:\\Users\\14799\\OneDrive - whu.edu.cn\\桌面\\test\\new_pdr_xy.csv"
+# path_list = [
+#     # IMU文件：时间戳，加速度，陀螺仪，磁力计，四元数
+#     "./data/server room test/mag map build/6/TEST_2022-07-28-150805_sensors.csv",
+#     # PDR坐标文件：x,y
+#     "./data/server room test/mag map build/6/TEST_2022-07-28-150805_sensors.csv.npy",
+#     # 打点文件：时间戳，x,y
+#     "./data/server room test/mag map build/6/TEST_2022-07-28-150805_points.csv"
+# ]
+
+dir_path = os.path.dirname(path_list[0])
+file_save_path = dir_path + "/marked_pdr_xy.csv"
+
+START = 0  # imu数据切掉的部分
+ABANDON_REMNANT = True  # 舍弃最后（最后打的点之后）多余的数据
 
 # 1.先根据时间戳将打点坐标和PDR坐标进行映射:
-START = 20
 imu_time_arr = np.loadtxt(path_list[0], delimiter=",")[START:, 0]
 pdr_xy_arr = np.load(path_list[1]) / 1000
 pt.paint_xy_list([pdr_xy_arr], ["PDR"])
@@ -67,7 +108,7 @@ mark_pdr_index_map = []
 pdr_index = 0
 for mark_index in range(0, len(mark_xy_arr)):
     mark_time = mark_xy_arr[mark_index, 0]
-    while pdr_index < len(pdr_time_arr) and pdr_time_arr[pdr_index] < mark_time:
+    while pdr_index < len(pdr_time_arr) - 1 and pdr_time_arr[pdr_index] < mark_time:
         pdr_index += 1
     mark_pdr_index_map.append([mark_index, pdr_index])
 
@@ -84,9 +125,9 @@ for i in range(1, len(mark_pdr_index_map)):
     end_pdr_xy = pdr_xy_arr[mark_pdr_index_map[i, 1], :].copy()
     print("start_pdr_index:", mark_pdr_index_map[i - 1, 1], "end_pdr_index:", mark_pdr_index_map[i, 1])
     print("start_pdr_xy:", start_pdr_xy, "end_pdr_xy", end_pdr_xy)
-    # pdr整段点（如果是最后一段，则将剩余的都包括进来）
+    # pdr子段（如果是最后一段，则判断是否要包括多余的）
     sub_pdr_xy = pdr_xy_arr[mark_pdr_index_map[i - 1, 1]:mark_pdr_index_map[i, 1] + 1, :].copy() if i != len(
-        mark_pdr_index_map) - 1 else pdr_xy_arr[mark_pdr_index_map[i - 1, 1]:, :].copy()
+        mark_pdr_index_map) - 1 or ABANDON_REMNANT else pdr_xy_arr[mark_pdr_index_map[i - 1, 1]:, :].copy()
     # pdr -> mark 的距离缩放倍数
     zoom_k = two_points_dis(start_mark_xy, end_mark_xy) / two_points_dis(start_pdr_xy, end_pdr_xy)
     print("zoom_k:", zoom_k)
@@ -127,5 +168,9 @@ for i in range(1, len(mark_pdr_index_map)):
         new_pdr_xy_list.append([x, y])
 
 
-pt.paint_xy_list([np.array(new_pdr_xy_list), pdr_xy_arr, mark_xy_arr[:, 1:3]], ["newPDR", "rawPDR", "markPoints"])
+pt.paint_xy_list([np.array(new_pdr_xy_list)], ["newPDR"])
+pt.paint_xy_list([mark_xy_arr[:, 1:3], np.array(new_pdr_xy_list), pdr_xy_arr],
+                 ["markPoints", "newPDR", "rawPDR"],
+                 [0, 16, -15, 15],
+                 save_file=dir_path + "/marked_pdr_xy_contrast.png")
 np.savetxt(file_save_path, new_pdr_xy_list, delimiter=",")

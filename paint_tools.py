@@ -7,10 +7,10 @@ import math
 # 根据块绘制栅格地磁强度图（热力图）
 # cmap:YlOrRd
 # 输入：[x][y][mv, mh]
-def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
+def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
     if show_mv:
         # plt.figure(figsize=(10, 36))
-        plt.figure(figsize=(36, 10))
+        plt.figure(figsize=(15, 10))
         plt.title('mag_vertical_' + str(num))
         # sns.set(font_scale=0.8)
         # cmap='YlOrRd'
@@ -21,11 +21,13 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
             mask=arr_mv_mh[:, ::-1, 0].T == -1,
             cbar=True, vmax=65, vmin=-1
         )
+        if save_dir is not None:
+            plt.savefig(save_dir+'_mv.png')
         plt.show()
 
     if show_mh:
         # plt.figure(figsize=(10, 36))
-        plt.figure(figsize=(36, 10))
+        plt.figure(figsize=(15, 10))
         plt.title('mag_horizontal_' + str(num))
         # sns.set(font_scale=0.8)
         # cmap='YlOrRd'
@@ -36,12 +38,14 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True):
             mask=arr_mv_mh[:, ::-1, 1].T == -1,
             cbar=True, vmax=65, vmin=-1
         )
+        if save_dir is not None:
+            plt.savefig(save_dir+'_mh.png')
         plt.show()
     return
 
 
 # 绘制二维坐标图
-def paint_xy_list(xy_arr_list, line_label_list, xy_range=None, title=None):
+def paint_xy_list(xy_arr_list, line_label_list, xy_range=None, title=None, save_file=None):
     if xy_range is not None:
         plt.figure(figsize=((xy_range[1] - xy_range[0]) / 3, (xy_range[3] - xy_range[2]) / 3))
         plt.xlim(xy_range[0], xy_range[1])
@@ -52,6 +56,9 @@ def paint_xy_list(xy_arr_list, line_label_list, xy_range=None, title=None):
     for xy_arr, line_label in zip(xy_arr_list, line_label_list):
         plt.plot(xy_arr[:, 0], xy_arr[:, 1], label=line_label)
     plt.legend()
+    # 保存图片
+    if save_file is not None:
+        plt.savefig(save_file)
     plt.show()
 
 

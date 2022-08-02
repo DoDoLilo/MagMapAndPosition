@@ -1,49 +1,73 @@
+import os
+
 import mag_mapping_tools as MMT
 import numpy as np
 
-# 坐标系位移（平移）
-MOVE_X = 25.
-MOVE_Y = 12.
-# 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y
-MAP_SIZE_X = 58.
-MAP_SIZE_Y = 16.
+# 坐标系位移（平移，单位：米）
+MOVE_X = 0.
+MOVE_Y = 0.
+# 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（单位：米）
+MAP_SIZE_X = 20.
+MAP_SIZE_Y = 15.
 # 地图地磁块大小
-BLOCK_SIZE = 0.3
+BLOCK_SIZE = 0.25
 # 低通滤波的程度，值越大滤波越强。整型，无单位。
 EMD_FILTER_LEVEL = 3
 # 内插半径
 INTER_RADIUS = 1
 # 内插迭代次数上限，目前未使用。目前方案是内插满后再根据DELETE_LEVEL进行删除
 # INTER_TIME_THR = 2
+# pdr滑动窗口距离
+PDR_IMU_ALIGN_SIZE = 10
+# 是否删除多余内插块
+DELETE_EXTRA_BLOCKS = True
 # 删除多余内插块的程度，越大删除的内插范围越大，可以为负值。
-DELETE_LEVEL = -3
-# 是否使用orientation传感器获取手机姿态角
+DELETE_LEVEL = 1
 
+# imu.csv, marked_pdr_xy.csv
 file_paths_build_map = [
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-1-4.247409484433081 Pixel 3a_sync.csv",
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-519-3-182.20603680993108 Pixel 3a_sync.csv"
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-523-4-16.85575427716903 Pixel 3a_sync.csv",
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-523-5-174.51484401105918 Pixel 3a_sync.csv"
-    "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-6-180.96802404173124 Pixel 3a_sync.csv",
-    "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-7-184.01945203456944 Pixel 3a_sync.csv"
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-8-182.21094088575512 Pixel 3a_sync.csv"
-    # "data/data_test/data_to_building_map/one_floor_hall_hallway/IMU-524-9-8.673526599631316 Pixel 3a_sync.csv"
+    ["./data/server room test/mag map build/1/TEST_2022-07-28-145322_sensors.csv",
+     "./data/server room test/mag map build/1/marked_pdr_xy.csv"],
+
+    ["./data/server room test/mag map build/2/TEST_2022-07-28-145643_sensors.csv",
+     "./data/server room test/mag map build/2/marked_pdr_xy.csv"],
+
+    ["./data/server room test/mag map build/3/TEST_2022-07-28-145932_sensors.csv",
+     "./data/server room test/mag map build/3/marked_pdr_xy.csv"],
+
+    ["./data/server room test/mag map build/4/TEST_2022-07-28-150211_sensors.csv",
+     "./data/server room test/mag map build/4/marked_pdr_xy.csv"],
+
+    ["./data/server room test/mag map build/5/TEST_2022-07-28-150518_sensors.csv",
+     "./data/server room test/mag map build/5/marked_pdr_xy.csv"],
+
+    ["./data/server room test/mag map build/6/TEST_2022-07-28-150805_sensors.csv",
+     "./data/server room test/mag map build/6/marked_pdr_xy.csv"]
 ]
 
-mag_map = MMT.build_map_by_files(
+# 构建文件夹
+save_dir_name = 'map_F'
+for file_path in file_paths_build_map:
+    save_dir_name += os.path.basename(os.path.dirname(file_path[0])) + '_'
+save_dir_name += "B_{0}".format(BLOCK_SIZE)
+save_dir_path = 'data/server room test/mag_map/' + save_dir_name
+save_dir_path += '_full' if not DELETE_EXTRA_BLOCKS else '_deleted'
+if not os.path.exists(save_dir_path):
+    os.mkdir(save_dir_path)
+
+mag_map = MMT.build_map_by_files_and_marked_pdr_xy(
     file_paths=file_paths_build_map,
-    move_x=MOVE_X, move_y=MOVE_Y,
     map_size_x=MAP_SIZE_X, map_size_y=MAP_SIZE_Y,
     # time_thr=INTER_TIME_THR,
     radius=INTER_RADIUS, block_size=BLOCK_SIZE,
-    delete_extra_blocks=False,
-    # delete_level=DELETE_LEVEL,
+    delete_extra_blocks=DELETE_EXTRA_BLOCKS,
+    delete_level=DELETE_LEVEL,
     lowpass_filter_level=EMD_FILTER_LEVEL,
+    pdr_imu_align_size=PDR_IMU_ALIGN_SIZE,
+    fig_save_dir=save_dir_path
 )
 
-# mag_map保存到 data/data_test/mag_map
-# mag_map[i][j][mv][mh]
-save_path = 'data/data_test/mag_map/one_floor_hall_hallway/map_F6_7_B30_full'
-np.savetxt(save_path + '/mv_qiu_2d.csv', mag_map[:, :, 0], delimiter=',')
-np.savetxt(save_path + '/mh_qiu_2d.csv', mag_map[:, :, 1], delimiter=',')
-print("Save files to:", save_path)
+# 保存建库文件
+np.savetxt(save_dir_path + '/mv_qiu_2d.csv', mag_map[:, :, 0], delimiter=',')
+np.savetxt(save_dir_path + '/mh_qiu_2d.csv', mag_map[:, :, 1], delimiter=',')
+print("Save files to:", save_dir_path)

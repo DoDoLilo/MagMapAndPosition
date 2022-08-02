@@ -44,13 +44,13 @@ ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △
 #
 # 607-4
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+    "./data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
+    "./data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
 PATH_MAG_MAP = [
-    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mv_qiu_2d.csv",
-    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mh_qiu_2d.csv"
+    "./data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mv_qiu_2d.csv",
+    "./data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mh_qiu_2d.csv"
 ]
 
 
