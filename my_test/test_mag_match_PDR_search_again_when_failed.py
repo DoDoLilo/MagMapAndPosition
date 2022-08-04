@@ -172,10 +172,10 @@ def main():
         raw_xy = MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], ORIGINAL_START_TRANSFER)
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
         # 计算轨迹距离
-        distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-            iLocator_xy, map_xy_with_index, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
-        distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-            iLocator_xy, raw_xy_with_index, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
+        distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
+            iLocator_xy, map_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
+        distance_of_PDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
+            iLocator_xy, raw_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
         mean_distance_between_MagPDR_GT = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
         mean_distance_between_PDR_GT = np.mean(distance_of_PDR_iLocator_points[:, 0])
         improvement = mean_distance_between_PDR_GT - mean_distance_between_MagPDR_GT
@@ -204,11 +204,11 @@ def main():
     # 4.4 利用前面记录的初始变换向量start_transfer，将PDR xy转换至MagMap中，作为未经过较准的对照组
     pdr_xy = MMT.transfer_axis_of_xy_seq(pdr_xy, ORIGINAL_START_TRANSFER)
     # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
-    distance_of_PDR_iLocator_points = TEST.cal_distance_between_iLocator_and_PDR(
-        iLocator_xy, pdr_xy, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
+    distance_of_PDR_iLocator_points = TEST.cal_distance_between_GT_and_PDR(
+        iLocator_xy, pdr_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
     # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
-    distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_iLocator_and_MagPDR(
-        iLocator_xy, magPDR_xy, pdr_imu_align_size=PDR_IMU_ALIGN_SIZE)
+    distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
+        iLocator_xy, magPDR_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离

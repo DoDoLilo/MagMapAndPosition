@@ -47,7 +47,7 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
 # 绘制二维坐标图
 def paint_xy_list(xy_arr_list, line_label_list, xy_range=None, title=None, save_file=None):
     if xy_range is not None:
-        plt.figure(figsize=((xy_range[1] - xy_range[0]) / 3, (xy_range[3] - xy_range[2]) / 3))
+        plt.figure(figsize=((xy_range[1] - xy_range[0]) / 2, (xy_range[3] - xy_range[2]) / 2))
         plt.xlim(xy_range[0], xy_range[1])
         plt.ylim(xy_range[2], xy_range[3])
     # 循环绘制多条线

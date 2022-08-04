@@ -20,20 +20,22 @@ def get_time_in_second():
 # 输入：iLocator xy，坐标系变换后的PDR xy，iLocator频率，PDR频率
 # 返回：distance_and_PDR_iLocator_points[N][5]：保存距离和坐标
 # 外层计算平均距离，则使用 np.mean(arr[:, 0], axis=0)即可。
-def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, pdr_imu_align_size=10):
-    if pdr_imu_align_size < 1:
+def cal_distance_between_GT_and_PDR(gt_xy, PDR_xy, xy_align_size=10):
+    if xy_align_size < 1:
         print("Wrong pdr_imu_align_size in cal_distance_between_iLocator_and_PDR")
         return None
 
-    distance_and_PDR_iLocator_points = []
+    distance_and_PDR_GT_points = []
 
     for i in range(0, len(PDR_xy)):
-        j = i * pdr_imu_align_size
+        j = i * xy_align_size
         # NOTE: 全是深拷贝，非地址拷贝
-        distance_and_PDR_iLocator_points.append([cal_distance(PDR_xy[i], iLocator_xy[j]),
+        if j >= len(gt_xy):
+            break
+        distance_and_PDR_GT_points.append([cal_distance(PDR_xy[i], gt_xy[j]),
                                                  PDR_xy[i][0], PDR_xy[i][1],
-                                                 iLocator_xy[j][0], iLocator_xy[j][1]])
-    return np.array(distance_and_PDR_iLocator_points)
+                                                 gt_xy[j][0], gt_xy[j][1]])
+    return np.array(distance_and_PDR_GT_points)
 
 
 # 但PDR xy到MagPDR xy经过的根据距离的下采样，导致下标不是均匀稀疏，
@@ -41,20 +43,22 @@ def cal_distance_between_iLocator_and_PDR(iLocator_xy, PDR_xy, pdr_imu_align_siz
 # 输入：iLocator xy，带下标信息的MagPDR xy[N][x, y, PDR_xy_index]，iLocator频率，PDR频率
 # 返回：distance_and_PDR_iLocator_points[N][5]：保存距离和坐标
 # 外层计算平均距离，则使用 np.mean(arr[:, 0], axis=0)即可。
-def cal_distance_between_iLocator_and_MagPDR(iLocator_xy, map_xy_with_index, pdr_imu_align_size=10):
-    if pdr_imu_align_size < 1:
+def cal_distance_between_GT_and_MagPDR(gt_xy, map_xy_with_index, xy_align_size=10):
+    if xy_align_size < 1:
         print("Wrong pdr_imu_align_size in cal_distance_between_iLocator_and_MagPDR")
         return None
 
-    distance_and_PDR_iLocator_points = []
+    distance_and_PDR_GT_points = []
     for i in range(0, len(map_xy_with_index)):
         map_pdr_xy_index = map_xy_with_index[i][2]
-        iLocator_xy_index = int(map_pdr_xy_index * pdr_imu_align_size)
+        gt_xy_index = int(map_pdr_xy_index * xy_align_size)
+        if gt_xy_index >= len(gt_xy):
+            break
         # NOTE: 全是深拷贝，非地址拷贝
-        distance_and_PDR_iLocator_points.append([cal_distance(map_xy_with_index[i], iLocator_xy[iLocator_xy_index]),
+        distance_and_PDR_GT_points.append([cal_distance(map_xy_with_index[i], gt_xy[gt_xy_index]),
                                                  map_xy_with_index[i][0], map_xy_with_index[i][1],
-                                                 iLocator_xy[iLocator_xy_index][0], iLocator_xy[iLocator_xy_index][1]])
-    return np.array(distance_and_PDR_iLocator_points)
+                                                 gt_xy[gt_xy_index][0], gt_xy[gt_xy_index][1]])
+    return np.array(distance_and_PDR_GT_points)
 
 
 # 输入两点坐标，p1[x,y],p2[x,y]

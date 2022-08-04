@@ -510,7 +510,7 @@ def transfer_axis_with_grad(transfer, x0, y0):
 
 
 # 输入：轨迹序列，转换向量
-# 输出：转换后的轨迹list
+# 输出：转换后的轨迹数组
 def transfer_axis_of_xy_seq(pdr_xy, transfer):
     map_xy = []
     for xy in pdr_xy:
@@ -864,7 +864,7 @@ def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
 def align_mv_mh_to_pdr(arr_mv_mh_mm, pdr_xy, pdr_imu_align_size):
     mv_mh_aligned_to_pdr = []
     for pdr_i in range(0, len(pdr_xy)):
-        raw_i = pdr_i * pdr_imu_align_size
+        raw_i = (pdr_i + 1) * pdr_imu_align_size
         raw_i_start = raw_i - int(pdr_imu_align_size / 2)
         raw_i_end = raw_i + int(pdr_imu_align_size / 2)
         if raw_i_start < 0:
