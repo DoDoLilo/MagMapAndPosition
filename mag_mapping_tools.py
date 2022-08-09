@@ -207,7 +207,8 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
                                        radius=1,
                                        block_size=0.3,
                                        delete_extra_blocks=False, delete_level=0,
-                                       lowpass_filter_level=3
+                                       lowpass_filter_level=3,
+                                       fig_save_dir=None
                                        ):
     if len(file_paths) == 0:
         return None
@@ -231,14 +232,13 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
     # 栅格化
     change_axis(data_x_y, move_x, move_y)
     rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/no_inter' if fig_save_dir is not None else None)
     # 内插填补，绘制结果
-    PT.paint_heat_map(rast_mv_mh)
     rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
     inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
-    # PT.paint_heat_map(rast_mv_mh, fill_num)
     if delete_extra_blocks:
         delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
-    PT.paint_heat_map(rast_mv_mh)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
     return rast_mv_mh
 
 

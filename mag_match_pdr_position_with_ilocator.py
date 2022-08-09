@@ -3,12 +3,13 @@ import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
 import paint_tools as PT
+import os
 
 # -----------地图系统参数------------------
 MOVE_X = 10.  # iLocator真值坐标平移参数（m）
-MOVE_Y = 20.
+MOVE_Y = 15.
 MAP_SIZE_X = 70.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（m）
-MAP_SIZE_Y = 30.
+MAP_SIZE_Y = 28.
 BLOCK_SIZE = 0.3  # 地图块大小，（m）
 EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
 BUFFER_DIS = 5  # 缓冲池大小（m）
@@ -17,66 +18,84 @@ DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数�
 SLIDE_STEP = 4  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 90  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 10  # 目标损失
+TARGET_MEAN_LOSS = 13  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 10 * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
 PDR_IMU_ALIGN_SIZE = 10  # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
 TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)],  # 枚举transfers的参数，[0] = [△x, △y(米), △angle(弧度)]
-                            [10, 10, 10]]  # [1] = [枚举的正负个数]
+                            [6, 6, 8]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 # PDR_IMU_START = 20  # PDR舍弃了所使用的IMU数据开头的一定数量的帧数
 # ---------数据文件路径---------------------------
-# 607-1
 # PATH_PDR_RAW = [
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv.npy",
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
-#
-# 607-2
+#     "./data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv.npy",
+#     "./data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv"]
 # PATH_PDR_RAW = [
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv.npy",
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv"]
-#
-# 607-3
+#     "./data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv.npy",
+#     "./data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv"]
 # PATH_PDR_RAW = [
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv.npy",
-#     "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
-#
-# 607-4
+    # "./data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv.npy",
+    # "./data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv"]
 PATH_PDR_RAW = [
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
-    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+    "./data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv.npy",
+    "./data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv"]
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
 PATH_MAG_MAP = [
-    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mv_qiu_2d.csv",
-    "../data/data_test/mag_map/one_floor_hall_hallway/map_F1_3_B25_full/mh_qiu_2d.csv"
+    "./data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv",
+    "./data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv"
 ]
 
 
 def main():
+    result_dir_path = os.path.dirname(PATH_PDR_RAW[0]) + '/result_3'
+    if not os.path.exists(result_dir_path):
+        os.mkdir(result_dir_path)
+    result_msg_file = open(result_dir_path + '/inf.txt', "w", encoding='GBK')
     paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
-    print("ORIGINAL_START_TRANSFER:", ORIGINAL_START_TRANSFER)
-    print("TARGET_MEAN_LOSS:", TARGET_MEAN_LOSS)
-    print("BUFFER_DIS", BUFFER_DIS)
-    print("Slide distance", SLIDE_STEP * SLIDE_BLOCK_SIZE)
+
+    print("MOVE_X = {0}\nMOVE_Y = {1}\nMAP_SIZE_X = {2}\nMAP_SIZE_Y = {3}\nBLOCK_SIZE = {4}\nEMD_FILTER_LEVEL = {5}\n"
+          "BUFFER_DIS = {6}\nDOWN_SIP_DIS = {7}\nSLIDE_STEP = {8}\nSLIDE_BLOCK_SIZE = {9}\nMAX_ITERATION = {10}\n"
+          "TARGET_MEAN_LOSS = {11}\nSTEP = {12}\nUPPER_LIMIT_OF_GAUSSNEWTEON = {13}\nPDR_IMU_ALIGN_SIZE = {14}\n"
+          "TRANSFERS_PRODUCE_CONFIG = {15}\nORIGINAL_START_TRANSFER = {16}\n\n"
+          "PATH_PDR_GT_IMU = {17}\nPATH_MAG_MAP = {18}\n\n".format(
+        MOVE_X, MOVE_Y, MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE, EMD_FILTER_LEVEL,
+        BUFFER_DIS, DOWN_SIP_DIS, SLIDE_STEP, SLIDE_BLOCK_SIZE, MAX_ITERATION,
+        TARGET_MEAN_LOSS, STEP, UPPER_LIMIT_OF_GAUSSNEWTEON, PDR_IMU_ALIGN_SIZE,
+        TRANSFERS_PRODUCE_CONFIG, ORIGINAL_START_TRANSFER,
+        PATH_PDR_RAW, PATH_MAG_MAP
+    ), file=result_msg_file)
+    print("MOVE_X = {0}\nMOVE_Y = {1}\nMAP_SIZE_X = {2}\nMAP_SIZE_Y = {3}\nBLOCK_SIZE = {4}\nEMD_FILTER_LEVEL = {5}\n"
+          "BUFFER_DIS = {6}\nDOWN_SIP_DIS = {7}\nSLIDE_STEP = {8}\nSLIDE_BLOCK_SIZE = {9}\nMAX_ITERATION = {10}\n"
+          "TARGET_MEAN_LOSS = {11}\nSTEP = {12}\nUPPER_LIMIT_OF_GAUSSNEWTEON = {13}\nPDR_IMU_ALIGN_SIZE = {14}\n"
+          "TRANSFERS_PRODUCE_CONFIG = {15}\nORIGINAL_START_TRANSFER = {16}\n\n"
+          "PATH_PDR_GT_IMU = {17}\nPATH_MAG_MAP = {18}\n\n".format(
+        MOVE_X, MOVE_Y, MAP_SIZE_X, MAP_SIZE_Y, BLOCK_SIZE, EMD_FILTER_LEVEL,
+        BUFFER_DIS, DOWN_SIP_DIS, SLIDE_STEP, SLIDE_BLOCK_SIZE, MAX_ITERATION,
+        TARGET_MEAN_LOSS, STEP, UPPER_LIMIT_OF_GAUSSNEWTEON, PDR_IMU_ALIGN_SIZE,
+        TRANSFERS_PRODUCE_CONFIG, ORIGINAL_START_TRANSFER,
+        PATH_PDR_RAW, PATH_MAG_MAP
+    ))
+
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
     mag_map = MMT.rebuild_map_from_mvh_files(PATH_MAG_MAP)
     if mag_map is None:
         print("Mag map rebuild failed!")
+        print("Mag map rebuild failed!", file=result_msg_file)
         return
-    # PT.paint_heat_map(mag_map)
+    PT.paint_heat_map(mag_map, save_dir=result_dir_path + '/')
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
     data_all = MMT.get_data_from_csv(PATH_PDR_RAW[1])
-    iLocator_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
+    gt_xy = data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]
     # 将iLocator_xy\pdr_xy的坐标平移到MagMap中
-    MMT.change_axis(iLocator_xy, MOVE_X, MOVE_Y)
+    MMT.change_axis(gt_xy, MOVE_X, MOVE_Y)
     MMT.change_axis(pdr_xy, MOVE_X, MOVE_Y)
-    PT.paint_xy_list([iLocator_xy, pdr_xy], ['GT', 'PDR'], paint_map_size, ' ')
+    PT.paint_xy_list([gt_xy, pdr_xy], ['GT', 'PDR'], paint_map_size, ' ')
     data_mag = data_all[:, 21:24]
     data_quat = data_all[:, 7:11]
 
@@ -90,8 +109,13 @@ def main():
         slide_block_size=SLIDE_BLOCK_SIZE
     )  # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
 
+    seq_num = len(match_seq_list)
+    print("Match seq number:", seq_num, file=result_msg_file)
+    print("Match seq number:", seq_num)
+
     if match_seq_list is None:
         print("Get match seq list failed!")
+        print("Get match seq list failed!", file=result_msg_file)
         return
 
     # 3、迭代匹配段
@@ -102,11 +126,14 @@ def main():
     #    3.2 基于初始匹配进行迭代
     map_xy_list = []
     for i in range(0, len(match_seq_list)):
-        print("\nMatch Seq {0} :".format(i))
+        print("\nMatch Seq {0}/{1} :".format(i, seq_num))
+        print("\nMatch Seq {0}/{1} :".format(i, seq_num), file=result_msg_file)
         match_seq = np.array(match_seq_list[i])  # 待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
         start_transfer = transfer.copy()  # NOTE: Use copy() if just pointer copy caused unexpect data changed
         print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]"
               .format(start_transfer[0], start_transfer[1], math.degrees(start_transfer[2])))
+        print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]"
+              .format(start_transfer[0], start_transfer[1], math.degrees(start_transfer[2])), file=result_msg_file)
         # 1.核心循环搜索代码
         transfer, map_xy = MMT.produce_transfer_candidates_and_search(start_transfer, TRANSFERS_PRODUCE_CONFIG,
                                                                       match_seq, mag_map,
@@ -123,6 +150,9 @@ def main():
         if not np.array_equal(transfer, start_transfer):
             print("\tFound new transfer:[{0:.5}, {1:.5}, {2:.5}°]"
                   .format(transfer[0], transfer[1], math.degrees(transfer[2])))
+            print("\tFound new transfer:[{0:.5}, {1:.5}, {2:.5}°]"
+                  .format(transfer[0], transfer[1], math.degrees(transfer[2])), file=result_msg_file)
+
             temp_map_xy = MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], transfer)
             mag_map_mvh = []
             mag_map_grads = []
@@ -144,6 +174,13 @@ def main():
                   .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
                           unsameness_mv, unsameness_mh, unsameness_all,
                           grad_level_mv, grad_level_mh, grad_level_all))
+            print("\tFeatures of map mag:"
+                  "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
+                  "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
+                  "\n\t\t.grad level mv, mh, all: {6:.4}, {7:.4} = {8:.4}"
+                  .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
+                          unsameness_mv, unsameness_mh, unsameness_all,
+                          grad_level_mv, grad_level_mh, grad_level_all), file=result_msg_file)
             # 现在根据全部已有特征判断当前transfer要不要使用。如果判断不使用，则回退transfer
             if not MMT.trusted_mag_features():
                 transfer = start_transfer
@@ -159,6 +196,11 @@ def main():
               "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
               .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
                       unsameness_mv, unsameness_mh, unsameness_all))
+        print("\tFeatures of real time mag: "
+              "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
+              "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
+              .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
+                      unsameness_mv, unsameness_mh, unsameness_all), file=result_msg_file)
         # 特征输出完毕，这些print后续可以去掉-----------------------------------------------------------------------------
 
         # 4.计算该段raw_xy（仅初始对齐的PDR轨迹）\map_xy和真值iLocator_xy的误差距离，并打印输出
@@ -173,19 +215,24 @@ def main():
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
         # 计算轨迹距离
         distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
-            iLocator_xy, map_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
+            gt_xy, map_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
         distance_of_PDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
-            iLocator_xy, raw_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
+            gt_xy, raw_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
         mean_distance_between_MagPDR_GT = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
         mean_distance_between_PDR_GT = np.mean(distance_of_PDR_iLocator_points[:, 0])
         improvement = mean_distance_between_PDR_GT - mean_distance_between_MagPDR_GT
         print("\tMean Distance between PDR and GT: %.3f" % mean_distance_between_PDR_GT)
         print("\tMean Distance between MagPDR and GT: %.3f" % mean_distance_between_MagPDR_GT)
         print("\tImprovement: %.3f" % improvement)
+        print("\tMean Distance between PDR and GT: %.3f" % mean_distance_between_PDR_GT, file=result_msg_file)
+        print("\tMean Distance between MagPDR and GT: %.3f" % mean_distance_between_MagPDR_GT, file=result_msg_file)
+        print("\tImprovement: %.3f" % improvement, file=result_msg_file)
 
     # -----------4 计算结果参数------------------------------------------------------------------------------------------
     print("\n\n====================MagPDR End =============================================")
     print("Calculate and show the Evaluation results:")
+    print("\n\n====================MagPDR End =============================================", file=result_msg_file)
+    print("Calculate and show the Evaluation results:", file=result_msg_file)
     # 4.1.png 将计算的分段mag xy合并还原为一整段 final_xy
     final_xy = []
     final_index = []
@@ -205,30 +252,39 @@ def main():
     pdr_xy = MMT.transfer_axis_of_xy_seq(pdr_xy, ORIGINAL_START_TRANSFER)
     # 4.5 计算PDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_PDR_iLocator_points = TEST.cal_distance_between_GT_and_PDR(
-        iLocator_xy, pdr_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
+        gt_xy, pdr_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
     # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
-        iLocator_xy, magPDR_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
+        gt_xy, magPDR_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
     mean_distance = np.mean(distance_of_PDR_iLocator_points[:, 0])
     print("\tMean Distance between PDR and GT: ", mean_distance)
+    print("\tMean Distance between PDR and GT: ", mean_distance, file=result_msg_file)
 
     # 5.2 打印MagPDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
     mean_distance = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
     print("\tMean Distance between MagPDR and GT: ", mean_distance)
+    print("\tMean Distance between MagPDR and GT: ", mean_distance, file=result_msg_file)
 
     # 5.3 对Ground Truth(iLocator)、PDR、MagPDR进行绘图
-    PT.paint_xy_list([iLocator_xy], ["GT by iLocator"], paint_map_size, ' ')
-    PT.paint_xy_list([pdr_xy], ["PDR"], paint_map_size, ' ')
+    PT.paint_xy_list([gt_xy], ["GT by iLocator"], paint_map_size, ' ', save_file=result_dir_path + '/GT by iLocator.png')
+    PT.paint_xy_list([pdr_xy], ["PDR"], paint_map_size, ' ', save_file=result_dir_path + '/PDR.png')
     PT.paint_xy_list([final_xy],
                      ['MagPDR'],
                      paint_map_size,
                      "The MagPDR: BlockSize={0}, BufferDis={1}, MaxIteration={2}, Step={3:.8f}, TargetLoss={4}"
-                     .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_MEAN_LOSS)
-                     )
-    PT.paint_xy_list([iLocator_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines")
+                     .format(BLOCK_SIZE, BUFFER_DIS, MAX_ITERATION, STEP, TARGET_MEAN_LOSS),
+                     save_file=result_dir_path + '/MagPDR.png')
+    PT.paint_xy_list([gt_xy, pdr_xy], ['GT', 'PDR'], paint_map_size, 'Contrast of Lines',
+                     save_file=result_dir_path + '/GT PDR.png')
+    PT.paint_xy_list([gt_xy, final_xy], ['GT', 'MagPDR'], paint_map_size, "Contrast of Lines",
+                     save_file=result_dir_path + '/GT MagPDR.png')
+    PT.paint_xy_list([gt_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines",
+                     save_file=result_dir_path + '/GT PDR MagPDR.png')
+
+    result_msg_file.close()
     return
 
 

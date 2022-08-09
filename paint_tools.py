@@ -10,7 +10,7 @@ import math
 def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
     if show_mv:
         # plt.figure(figsize=(10, 36))
-        plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(20, 10))
         plt.title('mag_vertical_' + str(num))
         # sns.set(font_scale=0.8)
         # cmap='YlOrRd'
@@ -27,7 +27,7 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
 
     if show_mh:
         # plt.figure(figsize=(10, 36))
-        plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(20, 10))
         plt.title('mag_horizontal_' + str(num))
         # sns.set(font_scale=0.8)
         # cmap='YlOrRd'
