@@ -65,3 +65,15 @@ def cal_distance_between_GT_and_MagPDR(gt_xy, map_xy_with_index, xy_align_size=1
 # 返回两点距离
 def cal_distance(p1, p2):
     return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+
+
+# 根据输入的点与真值的距离数组，计算1倍σ评估参数
+# 返回一倍σ评估指标：65%的坐标与真值的距离是1m以内。
+def cal_sigma_level(target_dis, dis_arr):
+    target_num = 0
+    for dis in dis_arr:
+        if dis[0] <= target_dis:
+            target_num += 1
+    target_percent = target_num / len(dis_arr)
+    sigma_percent = target_percent / 0.65
+    return target_percent, sigma_percent

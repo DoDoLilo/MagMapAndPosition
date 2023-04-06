@@ -1,0 +1,23 @@
+1、使用mag_match_pdr_position_with_ilocator.py改造
+2、列出已有的测试文件名单，只使用“信息中心”和“星湖楼”的文件进行实验；
+3、遍历读出所有文件进行实验（信息中心、星湖楼的文件分开实验，使用固定的mag_map）；
+    文件结构：第一行是mag_map+map_size_xy+move_xy，剩余的是数据对{.npy, _sync.csv}
+
+4、参数的排列组合，选出会影响性能和精度的参数，给一个范围、变化粒度，让他们排列组合进行试验（就和构建枚举一样）
+5、跑的结果按参数和精度结果输出一个excel表格，好统计（想一下excel列结构怎么好统计）：
+    excel结构：
+    每一行是一个实验：前面的列保存使用的参数、后面的列保存误差信息、+运行时间、+总距离、运行时间/总距离;
+
+6、要测试的参数：参数名，最小值，最大值，变化粒度
+        BUFFER_DIS, （滑动窗口大小）
+        SLIDE_STEP,  （滑动距离）
+        MAX_ITERATION,  （高斯牛顿迭代次数）
+        TARGET_MEAN_LOSS,   （损失阈值）
+        STEP,   （高斯牛顿迭代步长）
+        TRANSFERS_PRODUCE_CONFIG[0][0],
+        TRANSFERS_PRODUCE_CONFIG[0][1],
+        TRANSFERS_PRODUCE_CONFIG[0][2],
+        TRANSFERS_PRODUCE_CONFIG[1][0],
+        TRANSFERS_PRODUCE_CONFIG[1][1],
+        TRANSFERS_PRODUCE_CONFIG[1][2],
+

@@ -224,6 +224,7 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
         data_quat = np.vstack((data_quat, data_all[:, 7:11]))
         data_x_y = np.vstack((data_x_y, data_all[:, np.shape(data_all)[1] - 5:np.shape(data_all)[1] - 3]))
 
+    # 地磁转为垂直、水平分量mv\mh
     arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
     # emd滤波，太慢了，不过是建库阶段，无所谓
     mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
@@ -236,6 +237,7 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
     # 内插填补，绘制结果
     rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
     inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
     if delete_extra_blocks:
         delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
     PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
@@ -244,7 +246,7 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
 
 # 1. 相比build_map_by_files_and_ilocator_xy，使用的是经过打点较准后的marked_pdr_xy，
 # 2. 且pdr坐标和imu数据分开输入，所以需要对齐后使用.
-# 3. 因为是已经被打点较准的pdr，所以不需要再平移到地图坐标系.
+# 3. 因为是已经被打点较准的pdr，所以不需要设置move_x,y再平移到植指纹地图坐标系.
 def build_map_by_files_and_marked_pdr_xy(file_paths,
                                          map_size_x, map_size_y,
                                          time_thr=-1,
@@ -284,14 +286,14 @@ def build_map_by_files_and_marked_pdr_xy(file_paths,
 
     # 栅格化
     rast_mv_mh = build_rast_mv_mh(mv_mh_pdr_xy[:, 0:2], mv_mh_pdr_xy[:, 2:4], map_size_x, map_size_y, block_size)
-    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir+'/no_inter' if fig_save_dir is not None else None)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/no_inter' if fig_save_dir is not None else None)
     # 内插填补
     rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
     inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
     # PT.paint_heat_map(rast_mv_mh, fill_num)
     if delete_extra_blocks:
         delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
-    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir+'/intered' if fig_save_dir is not None else None)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
     return rast_mv_mh
 
 
@@ -309,14 +311,14 @@ def inter_fill_completely(rast_mv_mh, time_thr=-1, radius=1, block_size=0.3):
 
 # 输入：内插前的栅格化数组rast_raw，内插后数组rast_inter，内插半径，块大小，删除程度(允许<0)
 # delete_level: =0的时候，保留内插半径圆范围内的块（所以=0的时候也可能进行删除），>0的时候删除的更多，<0的时候保留范围会扩大！
-# 输出：保留原始位置一个半径内的内插值后的数组
+# 输出：保留原始位置一个范围内的内插值后的数组
 # 实现：1、copy rast_raw；2、遍历rast_raw，将要保留的位置在copy中置 1；3、修改rast_inter
-def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, delete_level):
+def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_intered, radius, block_size, delete_level):
     # 1
     if len(rast_mv_mh_raw) == 0:
         return
     copy_rast_raw = np.copy(rast_mv_mh_raw)
-    far_most = int(radius / math.sqrt(2 * block_size ** 2)) - delete_level
+    far_most = int(radius / math.sqrt(2 * (block_size ** 2))) - delete_level
     if far_most < 0:
         far_most = 0
     # 2
@@ -333,8 +335,8 @@ def delete_far_blocks(rast_mv_mh_raw, rast_mv_mh_inter, radius, block_size, dele
     for i in range(0, len_1):
         for j in range(0, len_2):
             if copy_rast_raw[i][j][0] == -1:
-                rast_mv_mh_inter[i][j][0] = -1
-                rast_mv_mh_inter[i][j][1] = -1
+                rast_mv_mh_intered[i][j][0] = -1
+                rast_mv_mh_intered[i][j][1] = -1
     return
 
 
@@ -743,7 +745,7 @@ def samples_buffer_PDR(buffer_dis, down_sip_dis,
     return match_seq_list
 
 
-# TEST 测试slide_dis == buffer_dis时（退化为无滑动窗口），本方法与方法[samples_buffer_PDR]结果不同的原因：
+# 测试slide_dis == buffer_dis时（退化为无滑动窗口），本方法与方法[samples_buffer_PDR]结果不同的原因：
 #     由于本方法下采样与填充buffer的逻辑分离，在计算缓冲池距离增量时，本方法的距离增加粒度是下采样后的粒度。
 #     而方法[samples_buffer_PDR]中，下采样与填充buffer的逻辑同时进行，buffer距离增加粒度是下采样前的粒度。
 #     所以方法[samples_buffer_PDR]的buffer距离增量可能会比本方法先一步达到buffer_dis，导致len(match_seq)不一致（本方法可能多1）
@@ -807,7 +809,7 @@ def samples_buffer_with_pdr_and_slidewindow(buffer_dis, downsampling_dis,
 
     # 先填满一个窗口，装入match_seq_list
     index = 0
-    last_slide_index = -1  # 上一次记录滑窗的下标，注意初值-1
+    last_slide_index = 0  # 上一次记录滑窗的下标
     window_buffer.append(xy_mvh_downsampled_list[index])
     index += 1
     while dis_sum_buffer < buffer_dis:
@@ -934,7 +936,8 @@ def produce_transfer_candidates_ascending(original_transfer, config):
 
 class SearchPattern(Enum):
     FULL_DEEP = 0
-    BREAKE_ADVANCED = 1
+    BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED = 1
+    BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED = 2
 
 
 # 输入：用于生成transfer_candidates：初始变换向量original_transfer，范围参数area_config，
@@ -944,60 +947,87 @@ class SearchPattern(Enum):
 #      search_pattern 是否在找到小于target loss的transfer就马上退出
 # 输出：最终选择的Transfer（当小范围寻找失败时，则返回original_transfer），以及其对应的map_xy
 def produce_transfer_candidates_and_search(start_transfer, area_config,
-                                           match_seq, mag_map, block_size, step, max_iteration,
-                                           target_loss,
-                                           upper_limit_of_gaussnewteon,
-                                           search_pattern=SearchPattern.BREAKE_ADVANCED):
+                                           match_seq,
+                                           mag_map, block_size,
+                                           step, max_iteration, target_loss, upper_limit_of_gaussnewteon,
+                                           search_pattern=SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED):
+    max_iteration += 1
+
     # 1.生成小范围的所有transfer_candidates（包括start_transfer，且范围由近到远）
     transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
 
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
     candidates_loss_xy_tf = []
-    max_mean_sub_loss = 0
+
     for transfer in transfer_candidates:
         # 根据经验判断当前loss是否已经超出了高斯牛顿迭代的优化能力
         out_of_map, start_loss, not_use_map_xy, not_use_transfer = cal_new_transfer_and_last_loss_xy(
             transfer, match_seq, mag_map, block_size, step)
         if out_of_map or start_loss - target_loss > upper_limit_of_gaussnewteon:
             # 超过了高斯牛顿的迭代能力，不用继续迭代了，直接下一个candidate
-            # NOTE：如果用了新的文件打算找新的max_mean_sub_loss，则要注释掉这个逻辑！
             continue
 
         last_loss_xy_tf_num = None
         loss_list = []
-        for iter_num in range(0, max_iteration):
+        # 高斯牛顿迭代
+        TEST_start_transfer = transfer.copy()
+        for iter_num in range(1, max_iteration):
             out_of_map, loss, map_xy, next_transfer = cal_new_transfer_and_last_loss_xy(
                 transfer, match_seq, mag_map, block_size, step)
-
+            # 界内
             if not out_of_map:
                 loss_list.append(loss)
+                if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
+                    last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+                # 损失达标
                 if loss <= target_loss:
                     last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
-                    if search_pattern == SearchPattern.BREAKE_ADVANCED:
+                    if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED \
+                            or search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
                         print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
-                        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
-                            loss_list) > 1 else 0
-                        max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
-                        print("\t\t.max mean loss sub = ", max_mean_sub_loss)
+
+                        # TEST
+                        # print("Start transfer = ",
+                        #                         #       [TEST_start_transfer[0], TEST_start_transfer[1], math.degrees(TEST_start_transfer[2])],
+                        #                         #       "Last transfer = ", [transfer[0], transfer[1], math.degrees(transfer[2])],
+                        #                         #       "Change = ", [(transfer[0] - TEST_start_transfer[0]),
+                        #                         #                     (transfer[1] - TEST_start_transfer[1]),
+                        #                         #                     math.degrees(transfer[2] - TEST_start_transfer[2])],
+                        #                         #       "Iter num = ", iter_num,
+                        #                         #       "Mean change = ", [(transfer[0] - TEST_start_transfer[0]) / iter_num,
+                        #                         #                          (transfer[1] - TEST_start_transfer[1]) / iter_num,
+                        #                         #                          math.degrees(transfer[2] - TEST_start_transfer[2]) / iter_num],
+                        #                         #       "Start loss = ", start_loss,
+                        #                         #       "Final loss = ", loss)
+
                         return transfer, map_xy
                 else:  # loss > target and not out of map, continue try next transfer.
                     transfer = next_transfer
             else:
                 break
 
-        mean_sub_loss = (loss_list[0] - loss_list[len(loss_list) - 1]) / (len(loss_list) - 1) if len(
-            loss_list) > 1 else 0
-        max_mean_sub_loss = mean_sub_loss if mean_sub_loss > max_mean_sub_loss else max_mean_sub_loss
+        # TEST
+        # print("Start transfer = ",
+        #       [TEST_start_transfer[0], TEST_start_transfer[1], math.degrees(TEST_start_transfer[2])],
+        #       "Last transfer = ", [transfer[0], transfer[1], math.degrees(transfer[2])],
+        #       "Change = ", [(transfer[0] - TEST_start_transfer[0]),
+        #                     (transfer[1] - TEST_start_transfer[1]),
+        #                     math.degrees(transfer[2] - TEST_start_transfer[2])],
+        #       "Iter num = ", iter_num,
+        #       "Mean change = ", [(transfer[0] - TEST_start_transfer[0]) / iter_num,
+        #                          (transfer[1] - TEST_start_transfer[1]) / iter_num,
+        #                          math.degrees(transfer[2] - TEST_start_transfer[2]) / iter_num],
+        #       "Start loss = ", start_loss,
+        #       "Final loss = ", loss)
 
         if last_loss_xy_tf_num is not None:
             candidates_loss_xy_tf.append(last_loss_xy_tf_num)
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
-    if search_pattern == SearchPattern.BREAKE_ADVANCED:
-        print("\t\t.Failed search, use last transfer.")
-        print("\t\t.max mean loss sub = ", max_mean_sub_loss)
+    if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED:
+        print("\t\t.Failed search, use last transfer. Final loss = ", loss)
         return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
 
-    # if search_pattern == SearchPattern.FULL_DEEP:
+    # if search_pattern == SearchPattern.FULL_DEEP or BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
     # 选出候选集中Loss最小的项，返回其transfer；
     # 若无候选项，则表示小范围寻找失败，返回original_transfer
     transfer = None
@@ -1009,12 +1039,14 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
             min_xy = c[1]
             transfer = c[2]
 
-    if transfer is None:
-        print("\t\t.Failed search, use last transfer.")
+    if transfer is None or (
+            search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED and min_loss > target_loss * 2):
+        print("\t\t.Failed search, use last transfer.Final loss = ", min_loss)
         return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
     else:
-        print("\t\t.Succeed search, final loss = ", min_loss)
+        print("\t\t.Found min, final loss = ", min_loss)
         return transfer, min_xy
+
 
 
 # 均值移除
