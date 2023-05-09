@@ -19,7 +19,7 @@ DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数�
 SLIDE_STEP = 4  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 90  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 20  # 目标损失
+TARGET_MEAN_LOSS = 30  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 10 * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
@@ -27,7 +27,7 @@ PDR_IMU_ALIGN_SIZE = 10  # 1个PDR坐标对应的imu\iLocator数据个数，iLoc
 TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, math.radians(1.5)],  # 枚举transfers的参数，[0] = [△x, △y(米), △angle(弧度)]
                             [5, 5, 5]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
-SEARCH_PATTERN = MMT.SearchPattern.BREAKE_ADVANCED  # 在搜索成功（失败）时，提前返回还是继续搜索。
+SEARCH_PATTERN = MMT.SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED  # 在搜索成功（失败）时，提前返回还是继续搜索。
 # ---------数据文件路径---------------------------
 # PATH_PDR_GT_IMU = [
 #     "./data/server room test/position test/6/TEST_2022-07-28-152749_sensors.csv.npy",  # 原始pdr轨迹
@@ -35,20 +35,15 @@ SEARCH_PATTERN = MMT.SearchPattern.BREAKE_ADVANCED  # 在搜索成功（失败�
 #     "./data/server room test/position test/6/TEST_2022-07-28-152749_sensors.csv",  # imu高频原始数据
 #     "./data/server room test/position test/6/pdr_xy_change_inf.csv"  # 原始pdr轨迹预处理变换信息
 # ]
-PATH_PDR_GT_IMU = ['./data/server room test/position test/4/TEST_2022-07-28-152525_sensors.csv.npy',
-                   './data/server room test/position test/4/marked_pdr_xy.csv',
-                   './data/server room test/position test/4/TEST_2022-07-28-152525_sensors.csv',
-                   './data/server room test/position test/4/pdr_xy_change_inf.csv']
+PATH_PDR_GT_IMU = ['./data/server room test/position test/6/TEST_2022-07-28-152749_sensors.csv.npy', './data/server room test/position test/6/marked_pdr_xy.csv', './data/server room test/position test/6/TEST_2022-07-28-152749_sensors.csv', './data/server room test/position test/6/pdr_xy_change_inf.csv']
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
-PATH_MAG_MAP = [
-    "./data/server room test/mag_map/map_F5_6_B_0.25_deleted/mv_qiu_2d.csv",
-    "./data/server room test/mag_map/map_F5_6_B_0.25_deleted/mh_qiu_2d.csv"
-]
+PATH_MAG_MAP = ['./data/server room test/mag_map/map_F5_6_B_0.25_deleted/mv_qiu_2d.csv', './data/server room test/mag_map/map_F5_6_B_0.25_deleted/mh_qiu_2d.csv']
 
 
 def main():
-    result_dir_path = os.path.dirname(PATH_PDR_GT_IMU[0]) + '/result_3'
+    result_dir_path = os.path.dirname(PATH_PDR_GT_IMU[0]) + '/result'
+    print(result_dir_path)
     if not os.path.exists(result_dir_path):
         os.mkdir(result_dir_path)
     result_msg_file = open(result_dir_path + '/inf.txt', "w", encoding='GBK')
@@ -265,6 +260,9 @@ def main():
     # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
         gt_xy, magPDR_xy, xy_align_size=1)
+
+    np.savetxt(result_dir_path + '/pdr_gt_dis.csv', distance_of_PDR_iLocator_points, delimiter=',')
+    np.savetxt(result_dir_path + '/magPdr_gt_dis.csv', distance_of_MagPDR_iLocator_points, delimiter=',')
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1.png 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离

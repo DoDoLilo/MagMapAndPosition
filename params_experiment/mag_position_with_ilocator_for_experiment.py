@@ -4,10 +4,9 @@ import time
 import mag_mapping_tools as MMT
 import numpy as np
 import my_test.test_tools as TEST
-import os
 
 
-# TODO 改成用参数调用
+# 改成用参数调用
 #   注释掉计算features的逻辑
 def mag_position_with_ilcator(
         MOVE_X, MOVE_Y,
@@ -20,10 +19,6 @@ def mag_position_with_ilcator(
         ORIGINAL_START_TRANSFER,
         PATH_PDR_RAW, PATH_MAG_MAP
 ):
-    result_dir_path = os.path.dirname(PATH_PDR_RAW[0]) + '/result_'
-    if not os.path.exists(result_dir_path):
-        os.mkdir(result_dir_path)
-
     # 全流程
     # 1.建库
     # 读取提前建库的文件，并合并生成原地磁指纹地图mag_map
@@ -53,7 +48,7 @@ def mag_position_with_ilcator(
     )  # match_seq_list：[?][?][x,y, mv, mh, PDRindex] (多条匹配序列)
 
     seq_num = len(match_seq_list)
-    print("Match seq number:", seq_num)
+    # print("Match seq number:", seq_num)
 
     if match_seq_list is None:
         print("Get match seq list failed!")
@@ -121,12 +116,12 @@ def mag_position_with_ilcator(
     mean_distance_of_mag_gt = np.mean(distance_of_MagPDR_iLocator_points[:, 0])
 
     # 打印magPDR与iLocator距离的一倍σ参数：65%的坐标与真值的距离是1m以内。
-    target_percent, sigma_percent = TEST.cal_sigma_level(1, distance_of_MagPDR_iLocator_points)
+    less_1m_percent, sigma_percent = TEST.cal_sigma_level(1, distance_of_MagPDR_iLocator_points)
 
     # 额外参数
     cost_time = end_time - start_time
     cost_time_per_meter = traj_dis / cost_time
 
-    return [mean_distance_of_pdr_gt, mean_distance_of_mag_gt, target_percent, sigma_percent, cost_time, cost_time_per_meter]
+    return [mean_distance_of_pdr_gt, mean_distance_of_mag_gt, less_1m_percent, sigma_percent, cost_time, cost_time_per_meter, traj_dis]
 
 

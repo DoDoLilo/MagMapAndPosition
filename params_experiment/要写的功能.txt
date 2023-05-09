@@ -21,3 +21,7 @@
         TRANSFERS_PRODUCE_CONFIG[1][1],
         TRANSFERS_PRODUCE_CONFIG[1][2],
 
+
+
+python D:\pythonProjects\MagMapAndPosition\atuo_params_experiment.py "D:\pythonProjects\MagMapAndPosition\params_experiment\file_list_infcenter.csv" "D:\pythonProjects\MagMapAndPosition\params_experiment\params_factory.csv"
+
