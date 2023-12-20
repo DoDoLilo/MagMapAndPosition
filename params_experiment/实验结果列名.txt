@@ -1,3 +1,9 @@
 mean_distance_of_pdr_gt, mean_distance_of_mag_gt, less_1m_percent, sigma_percent, cost_time, cost_time_per_meter, traj_dis
 mean_distance_of_pdr_gt	mean_distance_of_mag_gt	less_1m_percent	sigma_percent	cost_time		cost_time_per_meter traj_dis
-pdr和gt平均误差 地磁和gt平均误差  一米内的占比 一米内的占比/0.65 耗费时间 耗费时间/米 总轨迹长度
+pdr和gt平均误差	地磁和gt平均误差	一米内的占比	一米内的占比/0.65	耗费时间	耗费时间/米	总轨迹长度
+
+-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1	-1
+
+
+pdr和gt平均误差	地磁和gt平均误差	一米内的占比	一米内的占比/0.65	耗费时间	耗费时间/米	总轨迹长度
+

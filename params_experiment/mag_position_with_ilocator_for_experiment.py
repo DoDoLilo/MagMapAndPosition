@@ -120,7 +120,7 @@ def mag_position_with_ilcator(
 
     # 额外参数
     cost_time = end_time - start_time
-    cost_time_per_meter = traj_dis / cost_time
+    cost_time_per_meter = cost_time / traj_dis
 
     return [mean_distance_of_pdr_gt, mean_distance_of_mag_gt, less_1m_percent, sigma_percent, cost_time, cost_time_per_meter, traj_dis]
 

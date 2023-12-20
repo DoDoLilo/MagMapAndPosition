@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # 一个参数对应的一组文件的数量
     group_num = 5
     # 要进行过滤的文件
-    result_file = "D:\\pythonProjects\\MagMapAndPosition\\params_experiment\\1682563002_params_experiment.csv"
+    result_file = "D:\\pythonProjects\\MagMapAndPosition\\params_experiment\\1684128760_params_experiment.csv"
     #
     filtered_result_file = result_file[0:len(result_file) - len(".csv")] + "_filtered" + ".csv"
 
@@ -58,7 +58,9 @@ if __name__ == '__main__':
 
     # 要过滤的条件，[N][列，过滤条件]
     before_filter = len(result_data_list) / (group_num + 1)
-    filter_conditions = [[1, 1], [5, 1]]
+    # filter_conditions = [[1, 0.8], [5, 1]]
+    filter_conditions = [[1, 0.8], [5, 0.3]]
+    # filter_conditions = [[1, 1]]
     for fc in filter_conditions:
         data_filter(result_data_list, fc[0], fc[1], group_num)
 

@@ -917,7 +917,7 @@ def produce_transfer_candidates_ascending(original_transfer, config):
     len_y = len(y_candidates)
     len_angle = len(angle_candidates)
 
-    for i_t in range(0, len_x + len_y + len_angle):
+    for i_t in range(0, len_x + len_y + len_angle - 2):
         temp_list.append([])
 
     for i_x in range(0, len_x):
@@ -954,22 +954,28 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
 
     # 1.生成小范围的所有transfer_candidates（包括start_transfer，且范围由近到远）
     transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
+    # print(transfer_candidates)
 
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
     candidates_loss_xy_tf = []
 
+    loss_list = []
     for transfer in transfer_candidates:
         # 根据经验判断当前loss是否已经超出了高斯牛顿迭代的优化能力
         out_of_map, start_loss, not_use_map_xy, not_use_transfer = cal_new_transfer_and_last_loss_xy(
             transfer, match_seq, mag_map, block_size, step)
-        if out_of_map or start_loss - target_loss > upper_limit_of_gaussnewteon:
+        if out_of_map:
+            # print("\tOut of map at start")
+            continue
+
+        if start_loss - target_loss > upper_limit_of_gaussnewteon:
             # 超过了高斯牛顿的迭代能力，不用继续迭代了，直接下一个candidate
+            # print("\tCut")
             continue
 
         last_loss_xy_tf_num = None
         loss_list = []
         # 高斯牛顿迭代
-        TEST_start_transfer = transfer.copy()
         for iter_num in range(1, max_iteration):
             out_of_map, loss, map_xy, next_transfer = cal_new_transfer_and_last_loss_xy(
                 transfer, match_seq, mag_map, block_size, step)
@@ -984,6 +990,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
                     if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED \
                             or search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
                         # print("\t\t.search Succeed and break in advanced. Final loss = ", loss)
+                        # print("\t\tLoss list = ", loss_list)
 
                         # TEST
                         # print("Start transfer = ",
@@ -1003,6 +1010,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
                 else:  # loss > target and not out of map, continue try next transfer.
                     transfer = next_transfer
             else:
+                # print("\tOut of map, loss list = ", loss_list)
                 break
 
         # TEST
@@ -1024,6 +1032,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
     # 如果选择了提前结束，但是到了这一步，表示寻找失败
     if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED:
         # print("\t\t.Failed search, use last transfer. Final loss = ", loss)
+        # print("\t\tLoss list = ", loss_list)
         return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
 
     # if search_pattern == SearchPattern.FULL_DEEP or BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
@@ -1040,10 +1049,12 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
 
     if transfer is None or (
             search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED and min_loss > target_loss * 2):
-        # print("\t\t.Failed search, use last transfer.Final loss = ", min_loss)
+        # print("\t\t.Failed search, and can't find second, use last transfer.Final loss = ", min_loss)
+        # print("\t\tLoss list = ", loss_list)
         return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
     else:
-        # print("\t\t.Found min, final loss = ", min_loss)
+        # print("\t\t.Found min or second, final loss = ", min_loss)
+        # print("\t\tLoss list = ", loss_list)
         return transfer, min_xy
 
 
