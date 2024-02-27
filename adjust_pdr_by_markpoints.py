@@ -15,8 +15,8 @@ def two_slope_angle_off(v1, v2):
     # 方向向量
     x1, y1 = v1
     x2, y2 = v2
-    dot = x1 * x2 + y1 * y2
     det = x1 * y2 - y1 * x2
+    dot = x1 * x2 + y1 * y2
     theta = np.arctan2(det, dot)
     theta = theta if theta > 0 else 2 * np.pi + theta
     return theta
