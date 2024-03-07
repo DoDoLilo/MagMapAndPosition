@@ -5,7 +5,7 @@ import paint_tools as PT
 # 1层函数
 # 输入：其中一维（mv或mh）磁场指纹库数组，尺度范围（用具体值替代）s
 # 输出：多尺度特征数组
-# 实现：遍历全部ij数组，计算所有尺度，返回多维数组，TODO 存储下来
+# 实现：遍历全部ij数组，计算所有尺度，返回多维数组，存储下来
 def get_all_area_features(map, s_num):
     rows = len(map)
     cols = len(map[0])
@@ -33,20 +33,27 @@ def get_all_area_features(map, s_num):
 
 # 2层函数
 # 遍历给定ij与尺度的方形区域，做成1维数组
+# TODO 每行遍历后调换方向
 def get_area_1Ddata(map, i, j, s_num):
     rows = len(map)
     cols = len(map[0])
 
     data = []
-    for ti in range(i - round(s_num / 2), i + round(s_num / 2)):
+    change = False
+    half = round(s_num / 2)
+    for ti in range(i - half, i + half):
         if ti < 0 or ti >= rows:
             continue
-        for tj in range(j - round(s_num / 2), j + round(s_num / 2)):
+        for tj in range(j - half, j + half):
             if tj < 0 or tj >= cols:
                 continue
             if map[ti][tj] == -1:
                 continue
-            data.append(map[ti][tj])
+            if not change:
+                data.append(map[ti][tj])
+            else:
+                data.append(map[ti][half+half-tj])
+        change = not change
     return data
 
 
@@ -147,13 +154,13 @@ def get_seq_feature_seqs(seq, s_num):
     return fc_seq, td_seq, xgx_seq
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
-# PATH_MAG_MAP = [
-#     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv",
-#     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
-# ]
+PATH_MAG_MAP = [
+    "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv",
+    "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
+]
 
-PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
-                '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
+# PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
+#                 '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
 # 0层函数
 # 读取给的mv.csv mh.csv文件，计算所有区域特征的数组，保存结果为csv文件
 if __name__ == '__main__':
@@ -167,12 +174,14 @@ if __name__ == '__main__':
     mh_map_fc, mh_map_td, mh_map_xgx = get_all_area_features(mag_map[:, :, 1], s_num)
 
     # 保存结果
-    result_path = "results/mv_map_features/XingHu/s5/"
+    result_path = "results/mv_map_features/InfCenter/s5/"
+    # result_path = "results/mv_map_features/XingHu/s5/"
     np.savetxt(result_path+"fc.csv", mv_map_fc, delimiter=',')
     np.savetxt(result_path+"td.csv", mv_map_td, delimiter=',')
     np.savetxt(result_path+"xgx.csv", mv_map_xgx, delimiter=',')
 
-    result_path = "results/mh_map_features/XingHu/s5/"
+    result_path = "results/mh_map_features/InfCenter/s5/"
+    # result_path = "results/mh_map_features/XingHu/s5/"
     np.savetxt(result_path+"fc.csv", mh_map_fc, delimiter=',')
     np.savetxt(result_path+"td.csv", mh_map_td, delimiter=',')
     np.savetxt(result_path+"xgx.csv", mh_map_xgx, delimiter=',')

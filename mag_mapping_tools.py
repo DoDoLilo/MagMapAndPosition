@@ -1058,7 +1058,6 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
         return transfer, min_xy
 
 
-
 # 均值移除
 def remove_mean(magSerial):
     return magSerial - np.mean(magSerial)
@@ -1169,3 +1168,147 @@ def rebuild_map_from_mvh_files(mag_map_file_path):
 # TODO 根据特征计算判断是否要使用当前transfer
 def trusted_mag_features():
     return True
+
+
+# --------------LM法---------------------------------------------------------------------------------------------------------
+
+#  且不能接受GNI导致的loss上升
+def LM_produce_transfer_candidates_and_search(start_transfer, area_config,
+                                              match_seq,
+                                              mag_map, block_size,
+                                              step, max_iteration, target_loss, upper_limit_of_gaussnewteon,
+                                              search_pattern=SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED):
+    max_iteration += 1
+
+    # 1.生成小范围的所有transfer_candidates（包括start_transfer，且范围由近到远）
+    transfer_candidates = produce_transfer_candidates_ascending(start_transfer, area_config)
+    # print(transfer_candidates)
+
+    # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
+    candidates_loss_xy_tf = []
+
+    for transfer in transfer_candidates:
+        # 根据经验判断当前loss是否已经超出了高斯牛顿迭代的优化能力
+        out_of_map, start_loss, not_use_map_xy, not_use_transfer = cal_new_transfer_and_last_loss_xy(
+            transfer, match_seq, mag_map, block_size, step)
+        if out_of_map:
+            # print("\tOut of map at start")
+            continue
+
+        # if start_loss - target_loss > upper_limit_of_gaussnewteon:
+        #     # 超过了高斯牛顿的迭代能力，不用继续迭代了，直接下一个candidate
+        #     # print("\tCut")
+        #     continue
+
+        if start_loss > target_loss:
+            # TODO 高斯牛顿作用太垃圾了，改成QiuChao思路：
+            #  BFS枚举达到阈值就搜索成功，进行固定次数的GNI进行优化；
+            continue
+
+        last_loss_xy_tf_num = None
+        loss_list = []
+        # 高斯牛顿迭代
+        for iter_num in range(1, max_iteration):
+            out_of_map, loss, map_xy, next_transfer = LM_cal_new_transfer_and_last_loss_xy(
+                transfer, match_seq, mag_map, block_size, step)
+            # 界内
+            if not out_of_map:
+                loss_list.append(loss)
+                if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
+                    last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+                # 损失达标
+                if loss <= target_loss:
+                    last_loss_xy_tf_num = [loss, map_xy, transfer, iter_num]
+                    if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED \
+                            or search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
+                        return transfer, map_xy
+                else:  # loss > target and not out of map, continue try next transfer.
+                    transfer = next_transfer
+            else:
+                # print("\tOut of map, loss list = ", loss_list)
+                break
+
+        # print("\tloss list = ", loss_list)
+        if last_loss_xy_tf_num is not None:
+            candidates_loss_xy_tf.append(last_loss_xy_tf_num)
+    # 如果选择了提前结束，但是到了这一步，表示寻找失败
+    if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED:
+        # print("\t\t.Failed search, use last transfer. Final loss = ", loss)
+        # print("\t\tLoss list = ", loss_list)
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
+
+    # if search_pattern == SearchPattern.FULL_DEEP or BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
+    # 选出候选集中Loss最小的项，返回其transfer；
+    # 若无候选项，则表示小范围寻找失败，返回original_transfer
+    transfer = None
+    min_loss = None
+    min_xy = None
+    for c in candidates_loss_xy_tf:
+        if min_loss is None or c[0] < min_loss:
+            min_loss = c[0]
+            min_xy = c[1]
+            transfer = c[2]
+
+    if transfer is None or (
+            search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED and min_loss > target_loss * 2):
+        # print("\t\t.Failed search, and can't find second, use last transfer.Final loss = ", min_loss)
+        # print("\t\tLoss list = ", loss_list)
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
+    else:
+        # print("\t\t.Found min or second, final loss = ", min_loss)
+        # print("\t\tLoss list = ", loss_list)
+        return transfer, min_xy
+
+def LM_cal_new_transfer_and_last_loss_xy(transfer, sparse_pdr_xy_mvh, mag_map, block_size, step):
+    # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
+    pdr_xy = sparse_pdr_xy_mvh[:, 0:2]
+    pdr_mvh = sparse_pdr_xy_mvh[:, 2:4]
+    map_xy = []
+    xy_grads = []
+    for xy in pdr_xy:
+        x, y, grad = transfer_axis_with_grad(transfer, xy[0], xy[1])
+        map_xy.append([x, y])
+        xy_grads.append(grad)
+    map_xy = np.array(map_xy)
+    xy_grads = np.array(xy_grads)
+
+    # 2、由map_xy到mag_map中获取 map_mvh[M][mv, mh], mag_map_grads[M][2][[1×2]]
+    # 若获取到了-1，怎么办？表示到了地图外面，此种迭代方向错误-->提前结束迭代
+    # NOTE: 此时map_mvh可能为空
+    out_of_map = False
+    map_mvh = []
+    mag_map_grads = []
+    for xy in map_xy:
+        mvh, grad = get_linear_map_mvh_with_grad_2(mag_map, xy[0], xy[1], block_size)
+        if mvh[0] == -1 or mvh[1] == -1:
+            # print("The out point is:", xy, ", [", xy // block_size, "]")
+            out_of_map = True
+            break
+        map_mvh.append(mvh)
+        mag_map_grads.append(grad)
+
+    map_mvh = np.array(map_mvh)
+    mag_map_grads = np.array(mag_map_grads)
+
+    # 3、计算残差平方和last_loss，如果out_of_map = True，则last_loss无效
+    loss = cal_mean_loss(pdr_mvh, map_mvh) if not out_of_map else None
+
+    # 4、由cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step计算 _transfer
+    new_transfer = transfer.copy()
+
+    #    4.2 计算 _transfer 及其总和
+    for mag_map_grad, xy_grad, mag_P, mag_M in zip(mag_map_grads, xy_grads, pdr_mvh, map_mvh):
+        # TODO KJ论文公式有误，正确的是要在这里计算单独的 H 及其逆
+        matrix_H = cal_matrix_H(mag_map_grad, xy_grad)
+        try:
+            matrix_H_inverse = np.linalg.inv(matrix_H)
+        except np.linalg.LinAlgError:
+            matrix_H_inverse = np.linalg.pinv(matrix_H)
+
+        _transfer = cal_GaussNewton_increment(mag_map_grad, xy_grad, mag_P, mag_M, matrix_H_inverse) * step
+        new_transfer[0] += _transfer[0]
+        new_transfer[1] += _transfer[1]
+        new_transfer[2] += _transfer[2]
+
+    # NOTE:如果out_of_map = True，则last_loss无效
+    return out_of_map, loss, map_xy, new_transfer
