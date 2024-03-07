@@ -17,13 +17,13 @@ MAP_SIZE_Y = 20.
 # MAP_SIZE_Y = 28.0
 BLOCK_SIZE = 0.3  # 地图块大小，（m）
 EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
-BUFFER_DIS = 8  # 缓冲池大小（m）
+BUFFER_DIS = 9  # 缓冲池大小（m）
 DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
 # --------迭代搜索参数----------------------
 SLIDE_STEP = 2  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 80  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 80  # 目标损失
+TARGET_MEAN_LOSS = 70  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 500 * STEP * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------

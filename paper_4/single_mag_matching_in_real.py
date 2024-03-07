@@ -29,10 +29,10 @@ EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型�
 BUFFER_DIS = 5  # 缓冲池大小（m）
 DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
 # --------迭代搜索参数----------------------
-SLIDE_STEP = 2  # 滑动窗口步长
+SLIDE_STEP = 4  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 80  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 30  # 目标损失
+TARGET_MEAN_LOSS = 20  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
 UPPER_LIMIT_OF_GAUSSNEWTEON = 200 * STEP * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
@@ -67,11 +67,11 @@ ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △
 #     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
 # ]
 
-PATH_PDR_RAW = ['../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv.npy',
-                '../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv']
+# PATH_PDR_RAW = ['../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv.npy',
+#                 '../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv']
 
-# PATH_PDR_RAW = ['../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv.npy',
-#                 '../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv']
+PATH_PDR_RAW = ['../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv.npy',
+                '../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv']
 
 # PATH_PDR_RAW = ['../data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv.npy',
 #                 '../data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv']
@@ -148,47 +148,8 @@ def main():
     for i in range(0, len(match_seq_list)):
         print("\nMatch Seq {0}/{1} :".format(i, seq_num))
         match_seq = np.array(match_seq_list[i])  # 待匹配序列match_seq[N][x,y, mv, mh, PDRindex]
+        start_transfer = transfer.copy()
 
-        # 在这里，根据PDRindex找到GT段对应的xy，计算PDR段与GT段之间的transf0=[x, y, angle]（使用PDR_IMU_ALIGN_SIZE进行对齐）
-        # ①先获取pdr_tray与gt_tary
-        pdr_tray = match_seq[:, 0:2]  # [N][x,y]
-        gt_tray = []
-        for d in match_seq:
-            gt_tray.append(gt_xy[int(d[4] * PDR_IMU_ALIGN_SIZE)])
-        # ②根据adjust_pdr_by_markpoints.py计算初始transf0
-        pdr_s, pdr_e = pdr_tray[0], pdr_tray[-1]
-        gt_s, gt_e = gt_tray[0], gt_tray[-1]
-        v_pdr = pdr_e[0] - pdr_s[0], pdr_e[1] - pdr_s[1]
-        v_gt = gt_e[0] - gt_s[0], gt_e[1] - gt_s[1]
-        angle_off = two_slope_angle_off(v_pdr, v_gt)
-        # ③计算平移量，tansfer的逻辑是：先旋转，再对齐
-        # 先预先旋转、再计算平均距离差距
-        m_angle = np.array([[math.cos(angle_off), -math.sin(angle_off)],
-                            [math.sin(angle_off), math.cos(angle_off)]])
-        move_x_sum, move_y_sum = 0, 0
-        for j in range(0, len(pdr_tray)):
-            m_xy = np.array([[pdr_tray[j][0]],
-                             [pdr_tray[j][1]]])
-            ans = np.dot(m_angle, m_xy)
-            move_x_sum += gt_tray[j][0] - ans[0][0]
-            move_y_sum += gt_tray[j][1] - ans[1][0]
-        move_x_mean, move_y_mean = move_x_sum / len(pdr_tray), move_y_sum / len(pdr_tray)
-        # 测试下代码是否有问题 ↑
-        # new_pdr_tray = []
-        # for xy in pdr_tray:
-        #     nx, ny, ng = MMT.transfer_axis_with_grad([move_x_mean, move_y_mean, angle_off], xy[0], xy[1])
-        #     new_pdr_tray.append([nx, ny])
-        #
-        # PT.paint_xy_list([np.array(gt_tray),
-        #                   np.array(new_pdr_tray)],
-        #                  ['GT', 'new_pdr_tray'],
-        #                  paint_map_size,
-        #                  "Contrast of Lines")
-
-        # start_transfer = transfer.copy()
-        start_transfer = [move_x_mean, move_y_mean, angle_off]
-
-        # TODO start_transfer加一个随机干扰
         print("\tStart transfer:[{0:.5}, {1:.5}, {2:.5}°]"
               .format(start_transfer[0], start_transfer[1], math.degrees(start_transfer[2])))
         # 1.核心循环搜索代码
@@ -300,11 +261,11 @@ def main():
     # 4.6 计算MagPDR xy与Ground Truth(iLocator)之间的单点距离
     distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
         gt_xy, magPDR_xy, xy_align_size=PDR_IMU_ALIGN_SIZE)
-    # TODO 把distance_of_MagPDR_iLocator_points 与 final_mvh_seq 保存下来，在另一个.py文件里计算特征
-    np.savetxt(result_dir_path + "/disXy_mvhSeq_initByGT.csv",
+    # 把distance_of_MagPDR_iLocator_points 与 final_mvh_seq 保存下来，在另一个cal_seq_features_from_result.py里计算特征
+    np.savetxt(result_dir_path + "/disXy_mvhSeq_inReal.csv",
                np.concatenate((distance_of_MagPDR_iLocator_points, final_mvh_seq), axis=1),
                delimiter=',')
-    print("Save disxy_with_mvhseq to:" + result_dir_path + "/disXy_mvhSeq_initByGT.csv")
+    print("Save disxy_with_mvhseq to:" + result_dir_path + "/disXy_mvhSeq_inReal.csv")
 
     # 4.7 计算整段轨迹长度
     traj_length_dis = 0

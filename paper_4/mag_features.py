@@ -106,18 +106,18 @@ def seq_fc(sub_seq):
         t += (d-mean)**2
     return t/n
 
-# TODO min len(sub_seq) = 2
+# min len(sub_seq) = 2
 def seq_td(sub_seq):
     n = len(sub_seq)
     t = 0
     for i in range(0, n):
         if i == 0:
-            t += (sub_seq[i + 1] - sub_seq[i]) / 0.3
+            t += ((sub_seq[i + 1] - sub_seq[i]) / 0.3)**2
             continue
         if i == n - 1:
-            t += (sub_seq[i] - sub_seq[i - 1]) / 0.3
+            t += ((sub_seq[i] - sub_seq[i - 1]) / 0.3)**2
             continue
-        t += (sub_seq[i + 1] - sub_seq[i - 1]) / 0.6
+        t += ((sub_seq[i + 1] - sub_seq[i - 1]) / 0.6)**2
 
     return t/n
 
@@ -128,7 +128,7 @@ def seq_xgx(sub_seq):
     for i in range(1, n):
         f += (sub_seq[i - 1] - mean) * (sub_seq[i] - mean)
 
-    return f / ((n - 1) * seq_fc(sub_seq))
+    return (f / ((n - 1) * seq_fc(sub_seq)))**2
 
 def get_seq_sub_seq(seq, i, s_num):
     # 获取序列第i个位置前后半个s_num的子序列，s_num最小为3，len(sub_seq)最小为2
