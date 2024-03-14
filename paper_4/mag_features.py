@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import mag_mapping_tools as MMT
 import paint_tools as PT
@@ -7,6 +9,8 @@ import paint_tools as PT
 # 输出：多尺度特征数组
 # 实现：遍历全部ij数组，计算所有尺度，返回多维数组，存储下来
 def get_all_area_features(map, s_num):
+    only_features = []
+
     rows = len(map)
     cols = len(map[0])
 
@@ -25,11 +29,13 @@ def get_all_area_features(map, s_num):
             data = get_area_1Ddata(map, i, j, s_num)
             if len(data) < 3:
                 continue
+
             map_fc[i][j] = area_fc(data)
             map_td[i][j] = area_td(data)
             map_xgx[i][j] = area_xgx(data)
+            only_features.append([map_fc[i][j], map_td[i][j], map_xgx[i][j]])
 
-    return map_fc, map_td, map_xgx
+    return map_fc, map_td, map_xgx, only_features
 
 # 2层函数
 # 遍历给定ij与尺度的方形区域，做成1维数组
@@ -75,12 +81,12 @@ def area_td(data):
     f = 0
     for i in range(0, n):
         if i == 0:
-            f += (data[i + 1] - data[i]) / 0.3
+            f += ((data[i + 1] - data[i]) / 0.3)**2
             continue
         if i == n - 1:
-            f += (data[i] - data[i - 1]) / 0.3
+            f += ((data[i] - data[i - 1]) / 0.3)**2
             continue
-        f += (data[i + 1] - data[i - 1]) / 0.6
+        f += ((data[i + 1] - data[i - 1]) / 0.6)**2
     return f / n
 
 
@@ -128,7 +134,7 @@ def seq_xgx(sub_seq):
     for i in range(1, n):
         f += (sub_seq[i - 1] - mean) * (sub_seq[i] - mean)
 
-    return (f / ((n - 1) * seq_fc(sub_seq)))**2
+    return f / ((n - 1) * seq_fc(sub_seq))
 
 def get_seq_sub_seq(seq, i, s_num):
     # 获取序列第i个位置前后半个s_num的子序列，s_num最小为3，len(sub_seq)最小为2
@@ -159,30 +165,41 @@ PATH_MAG_MAP = [
     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
 ]
 
-# PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
-#                 '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
+# PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_3_4_B_0.3_full/mv_qiu_2d.csv',
+#                 '../data/XingHu hall 8F test/mag_map/map_F1_2_3_4_B_0.3_full/mh_qiu_2d.csv']
 # 0层函数
 # 读取给的mv.csv mh.csv文件，计算所有区域特征的数组，保存结果为csv文件
 if __name__ == '__main__':
     # mag_map[i][j] = [mv, mh]
     mag_map = MMT.rebuild_map_from_mvh_files(PATH_MAG_MAP)
+    new_mag_map = np.empty((len(mag_map), len(mag_map[0])))
+    for i in range(0, len(mag_map)):
+        for j in range(0, len(mag_map[0])):
+            mv = mag_map[i][j][0]
+            mh = mag_map[i][j][1]
+            if mv == -1 or mh == -1:
+                new_mag_map[i][j] = -1
+                continue
+            else:
+                new_mag_map[i][j] = math.sqrt(mv**2+mh**2)
 
     # 尺度s米
-    s = 5
-    s_num = int(5/0.3)
-    mv_map_fc, mv_map_td, mv_map_xgx = get_all_area_features(mag_map[:, :, 0], s_num)
-    mh_map_fc, mh_map_td, mh_map_xgx = get_all_area_features(mag_map[:, :, 1], s_num)
+    s = 3
+    s_num = int(s/0.3)
+    map_fc, map_td, map_xgx, only_fs = get_all_area_features(new_mag_map, s_num)
+
+    # 计算所有有效特征的均值、最大值、最小值
+    only_fs = np.array(only_fs)  # [N][fc, td, xgx]
+    for fs in only_fs.transpose():
+        print(sum(fs)/len(fs))
+        print(max(fs))
+        print(min(fs))
 
     # 保存结果
-    result_path = "results/mv_map_features/InfCenter/s5/"
-    # result_path = "results/mv_map_features/XingHu/s5/"
-    np.savetxt(result_path+"fc.csv", mv_map_fc, delimiter=',')
-    np.savetxt(result_path+"td.csv", mv_map_td, delimiter=',')
-    np.savetxt(result_path+"xgx.csv", mv_map_xgx, delimiter=',')
+    result_path = "results/map_area_features/InfCenter/s3/"
+    # result_path = "results/map_area_features/XingHu/s3/"
+    np.savetxt(result_path+"map_fc.csv", map_fc, delimiter=',')
+    np.savetxt(result_path+"map_td.csv", map_td, delimiter=',')
+    np.savetxt(result_path+"map_xgx.csv", map_xgx, delimiter=',')
 
-    result_path = "results/mh_map_features/InfCenter/s5/"
-    # result_path = "results/mh_map_features/XingHu/s5/"
-    np.savetxt(result_path+"fc.csv", mh_map_fc, delimiter=',')
-    np.savetxt(result_path+"td.csv", mh_map_td, delimiter=',')
-    np.savetxt(result_path+"xgx.csv", mh_map_xgx, delimiter=',')
 
