@@ -19,7 +19,7 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
             cmap='jet',
             # annot=True, fmt='.0f',
             mask=arr_mv_mh[:, ::-1, 0].T == -1,
-            cbar=True, vmax=500, vmin=-1
+            cbar=True, vmax=70, vmin=-1
         )
         if save_dir is not None:
             plt.savefig(save_dir+'_mv.png')
@@ -36,7 +36,7 @@ def paint_heat_map(arr_mv_mh, num=0, show_mv=True, show_mh=True, save_dir=None):
             cmap='jet',
             # annot=True, fmt='.0f',
             mask=arr_mv_mh[:, ::-1, 1].T == -1,
-            cbar=True, vmax=500, vmin=-1
+            cbar=True, vmax=70, vmin=-1
         )
         if save_dir is not None:
             plt.savefig(save_dir+'_mh.png')

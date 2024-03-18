@@ -146,22 +146,3 @@ if __name__ == '__main__':
                     csvfile.flush()
 
         csvfile.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

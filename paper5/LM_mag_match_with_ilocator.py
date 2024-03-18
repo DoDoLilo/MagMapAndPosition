@@ -7,35 +7,35 @@ import os
 import time
 
 # -----------地图系统参数------------------
-MOVE_X = 5.0  # iLocator真值坐标平移参数（m）
-MOVE_Y = 5.0
-MAP_SIZE_X = 35.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（m）
-MAP_SIZE_Y = 20.
-# MOVE_X = 10.0
-# MOVE_Y = 15.0
-# MAP_SIZE_X = 70.0
-# MAP_SIZE_Y = 28.0
+# MOVE_X = 5.0  # iLocator真值坐标平移参数（m）
+# MOVE_Y = 5.0
+# MAP_SIZE_X = 35.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（m）
+# MAP_SIZE_Y = 20.
+MOVE_X = 10.0
+MOVE_Y = 15.0
+MAP_SIZE_X = 70.0
+MAP_SIZE_Y = 28.0
 BLOCK_SIZE = 0.3  # 地图块大小，（m）
 EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
-BUFFER_DIS = 8  # 缓冲池大小（m）
+BUFFER_DIS = 12  # 缓冲池大小（m）
 DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
 # --------迭代搜索参数----------------------
 SLIDE_STEP = 2  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 80  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 50  # 目标损失
-STEP = 1 / 60  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-UPPER_LIMIT_OF_GAUSSNEWTEON = 500 * STEP * (MAX_ITERATION - 1)  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
+TARGET_MEAN_LOSS = 30  # 目标损失
+STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
+UPPER_LIMIT_OF_GAUSSNEWTEON = 4 * TARGET_MEAN_LOSS  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
 PDR_IMU_ALIGN_SIZE = 10  # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
-TRANSFERS_PRODUCE_CONFIG = [[0.2, 0.2, math.radians(1.2)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
-                            [8, 8, 10]]  # [1] = [枚举的正负个数]
+TRANSFERS_PRODUCE_CONFIG = [[0.4, 0.4, math.radians(1.2)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
+                            [2, 2, 2]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 # PDR_IMU_START = 20  # PDR舍弃了所使用的IMU数据开头的一定数量的帧数
 # ---------数据文件路径---------------------------
-PATH_PDR_RAW = [
-    "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv.npy",
-    "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv"]
+# PATH_PDR_RAW = [
+#     "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv.npy",
+#     "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv"]
 
 # PATH_PDR_RAW = [
 #     "../data/InfCenter server room/position_test/6/IMU-812-6-269.09426660025395 Pixel 6_sync.csv.npy",
@@ -54,14 +54,26 @@ PATH_PDR_RAW = [
 #     "../data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv"]
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
-PATH_MAG_MAP = [
-    "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv",
-    "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
+# PATH_MAG_MAP = [
+#     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv",
+#     "../data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv"
+# ]
+
+
+PATH_PDR_RAW_s = [
+['../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv.npy',
+                '../data/XingHu hall 8F test/position_test/5/IMU-88-5-291.0963959547511 Pixel 6_sync.csv'],
+['../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv.npy',
+                '../data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv'],
+['../data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv.npy',
+                '../data/XingHu hall 8F test/position_test/7/IMU-88-7-270.6518297687728 Pixel 6_sync.csv'],
+['../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv.npy',
+                '../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv']
 ]
+PATH_PDR_RAW = PATH_PDR_RAW_s[2]
 
-
-# PATH_PDR_RAW = ['./data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv.npy', './data/XingHu hall 8F test/position_test/6/IMU-88-6-194.9837361431375 Pixel 6_sync.csv']
-# PATH_MAG_MAP = ['./data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv', './data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
+PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
+                '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
 
 
 def main():
@@ -102,7 +114,7 @@ def main():
         print("Mag map rebuild failed!")
         print("Mag map rebuild failed!", file=result_msg_file)
         return
-    PT.paint_heat_map(mag_map, save_dir=result_dir_path + '/')
+    # PT.paint_heat_map(mag_map, save_dir=result_dir_path + '/')
 
     # 2、缓冲池给匹配段（内置稀疏采样），此阶段的data与上阶段无关
     pdr_xy = np.load(PATH_PDR_RAW[0])[:, 0:2]
@@ -203,22 +215,6 @@ def main():
             if not MMT.trusted_mag_features():
                 transfer = start_transfer
 
-        # 3. 计算实测序列中的地磁序列的特征
-        mag_vh_arr = match_seq[:, 2:4]
-        # PT.paint_signal(mag_vh_arr[:, 0], "Real mv Seq {0}".format(i))
-        # PT.paint_signal(mag_vh_arr[:, 1], "Real mh Seq {0}".format(i))
-        std_deviation_mv, std_deviation_mh, std_deviation_all = MMT.cal_std_deviation_mag_vh(mag_vh_arr)  # 标准差
-        unsameness_mv, unsameness_mh, unsameness_all = MMT.cal_unsameness_mag_vh(mag_vh_arr)  # 相邻不相关程度
-        print("\tFeatures of real time mag: "
-              "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
-              "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
-              .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
-                      unsameness_mv, unsameness_mh, unsameness_all))
-        print("\tFeatures of real time mag: "
-              "\n\t\t.deviation  mv, mh, all: {0:.4}, {1:.4} = {2:.4}"
-              "\n\t\t.unsameness mv, mh, all: {3:.4}, {4:.4} = {5:.4}"
-              .format(std_deviation_mv, std_deviation_mh, std_deviation_all,
-                      unsameness_mv, unsameness_mh, unsameness_all), file=result_msg_file)
         # 特征输出完毕，这些print后续可以去掉-----------------------------------------------------------------------------
 
         # 4.计算该段raw_xy（仅初始对齐的PDR轨迹）\map_xy和真值iLocator_xy的误差距离，并打印输出
@@ -231,6 +227,7 @@ def main():
         map_xy_with_index = np.concatenate((map_xy, index_list), axis=1)
         raw_xy = MMT.transfer_axis_of_xy_seq(match_seq[:, 0:2], ORIGINAL_START_TRANSFER)
         raw_xy_with_index = np.concatenate((raw_xy, index_list), axis=1)
+
         # 计算轨迹距离
         distance_of_MagPDR_iLocator_points = TEST.cal_distance_between_GT_and_MagPDR(
             gt_xy, map_xy_with_index, xy_align_size=PDR_IMU_ALIGN_SIZE)
@@ -280,8 +277,15 @@ def main():
     for i in range(1, len(pdr_xy)):
         traj_length_dis += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
 
-    np.savetxt(result_dir_path + '/pdr_gt_dis.csv', distance_of_PDR_iLocator_points, delimiter=',')
-    np.savetxt(result_dir_path + '/magPdr_gt_dis.csv', distance_of_MagPDR_iLocator_points, delimiter=',')
+
+    # magPDR + PDR + GT
+    final_all_xy = []
+    for mp in magPDR_xy:
+        pi = int(mp[2])
+        final_all_xy.append([mp[0], mp[1],
+                             pdr_xy[pi][0], pdr_xy[pi][1],
+                             gt_xy[pi*PDR_IMU_ALIGN_SIZE][0], gt_xy[pi*PDR_IMU_ALIGN_SIZE][1]])
+    np.savetxt(result_dir_path + '/magPdr_Pdr_gt(bad_GNI).csv', final_all_xy, delimiter=',')
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
