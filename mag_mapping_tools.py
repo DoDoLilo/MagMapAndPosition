@@ -959,7 +959,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
     # 2.遍历transfer_candidates进行高斯牛顿，结果添加到候选集candidates_loss_xy_tf
     candidates_loss_xy_tf = []
 
-    loss_list = []
+    all_loss_list = []
     for transfer in transfer_candidates:
         # 根据经验判断当前loss是否已经超出了高斯牛顿迭代的优化能力
         out_of_map, start_loss, not_use_map_xy, not_use_transfer = cal_new_transfer_and_last_loss_xy(
@@ -975,6 +975,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
 
         last_loss_xy_tf_num = None
         loss_list = []
+        all_loss_list.append(loss_list)
         # 高斯牛顿迭代
         for iter_num in range(1, max_iteration):
             out_of_map, loss, map_xy, next_transfer = cal_new_transfer_and_last_loss_xy(
@@ -1006,7 +1007,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
                         #                         #       "Start loss = ", start_loss,
                         #                         #       "Final loss = ", loss)
 
-                        return transfer, map_xy
+                        return transfer, map_xy, all_loss_list
                 else:  # loss > target and not out of map, continue try next transfer.
                     transfer = next_transfer
             else:
@@ -1033,7 +1034,7 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
     if search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_LAST_WHEN_FAILED:
         # print("\t\t.Failed search, use last transfer. Final loss = ", loss)
         # print("\t\tLoss list = ", loss_list)
-        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer), all_loss_list
 
     # if search_pattern == SearchPattern.FULL_DEEP or BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED:
     # 选出候选集中Loss最小的项，返回其transfer；
@@ -1051,11 +1052,11 @@ def produce_transfer_candidates_and_search(start_transfer, area_config,
             search_pattern == SearchPattern.BREAKE_ADVANCED_AND_USE_SECOND_LOSS_WHEN_FAILED and min_loss > target_loss * 2):
         # print("\t\t.Failed search, and can't find second, use last transfer.Final loss = ", min_loss)
         # print("\t\tLoss list = ", loss_list)
-        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer)
+        return start_transfer, transfer_axis_of_xy_seq(match_seq, start_transfer), all_loss_list
     else:
         # print("\t\t.Found min or second, final loss = ", min_loss)
         # print("\t\tLoss list = ", loss_list)
-        return transfer, min_xy
+        return transfer, min_xy, all_loss_list
 
 
 # 均值移除
