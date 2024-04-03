@@ -1,0 +1,270 @@
+MOVE_X = 5.0
+MOVE_Y = 5.0
+MAP_SIZE_X = 35.0
+MAP_SIZE_Y = 20.0
+BLOCK_SIZE = 0.3
+EMD_FILTER_LEVEL = 3
+BUFFER_DIS = 5
+DOWN_SIP_DIS = 0.3
+SLIDE_STEP = 4
+SLIDE_BLOCK_SIZE = 0.3
+MAX_ITERATION = 90
+TARGET_MEAN_LOSS = 50
+STEP = 0.02
+UPPER_LIMIT_OF_GAUSSNEWTEON = 890
+PDR_IMU_ALIGN_SIZE = 10
+TRANSFERS_PRODUCE_CONFIG = [[0.5, 0.5, 0.017453292519943295], [2, 2, 20]]
+ORIGINAL_START_TRANSFER = [0.0, 0.0, 0.0]
+
+PATH_PDR_GT_IMU = ['./data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv.npy', './data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv']
+PATH_MAG_MAP = ['./data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv', './data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv']
+
+
+Match seq number: 80
+
+Match Seq 0/80 :
+	Start transfer:[0.0, 0.0, 0.0бу]
+
+Match Seq 1/80 :
+	Start transfer:[0.0, 0.0, -1.0бу]
+
+Match Seq 2/80 :
+	Start transfer:[0.0, 0.0, -1.0бу]
+
+Match Seq 3/80 :
+	Start transfer:[0.0, 0.0, -1.0бу]
+
+Match Seq 4/80 :
+	Start transfer:[0.0, 0.0, -1.0бу]
+
+Match Seq 5/80 :
+	Start transfer:[1.263, -0.16698, 6.5422бу]
+
+Match Seq 6/80 :
+	Start transfer:[1.4088, -0.23751, 7.4664бу]
+
+Match Seq 7/80 :
+	Start transfer:[1.4088, -0.23751, 8.4664бу]
+
+Match Seq 8/80 :
+	Start transfer:[0.90876, -0.23751, 8.4664бу]
+
+Match Seq 9/80 :
+	Start transfer:[0.90876, -0.23751, 8.4664бу]
+
+Match Seq 10/80 :
+	Start transfer:[0.40876, -0.23751, 8.4664бу]
+
+Match Seq 11/80 :
+	Start transfer:[0.40876, -0.23751, 8.4664бу]
+
+Match Seq 12/80 :
+	Start transfer:[0.019526, -0.28217, 8.9541бу]
+
+Match Seq 13/80 :
+	Start transfer:[-0.51074, -0.23915, 3.7237бу]
+
+Match Seq 14/80 :
+	Start transfer:[-0.51074, -0.23915, 3.7237бу]
+
+Match Seq 15/80 :
+	Start transfer:[-0.53361, -0.20348, 3.524бу]
+
+Match Seq 16/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 17/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 18/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 19/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 20/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 21/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 22/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 23/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 24/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 25/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 26/80 :
+	Start transfer:[-0.56461, -0.1535, 3.2037бу]
+
+Match Seq 27/80 :
+	Start transfer:[-1.0178, 0.36247, 0.94563бу]
+
+Match Seq 28/80 :
+	Start transfer:[-1.3355, 0.78633, -0.8594бу]
+
+Match Seq 29/80 :
+	Start transfer:[-0.83548, 0.78633, -0.8594бу]
+
+Match Seq 30/80 :
+	Start transfer:[-0.40012, 0.25375, 1.4227бу]
+
+Match Seq 31/80 :
+	Start transfer:[-0.40012, 0.25375, 1.4227бу]
+
+Match Seq 32/80 :
+	Start transfer:[-0.40012, 0.25375, 1.4227бу]
+
+Match Seq 33/80 :
+	Start transfer:[-0.37764, 0.67187, 1.7522бу]
+
+Match Seq 34/80 :
+	Start transfer:[-0.37764, 0.67187, 2.7522бу]
+
+Match Seq 35/80 :
+	Start transfer:[-0.37764, 0.67187, 2.7522бу]
+
+Match Seq 36/80 :
+	Start transfer:[-0.37764, 0.67187, 2.7522бу]
+
+Match Seq 37/80 :
+	Start transfer:[-0.15748, 0.65797, 3.8529бу]
+
+Match Seq 38/80 :
+	Start transfer:[0.16631, 0.49805, 4.5368бу]
+
+Match Seq 39/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 40/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 41/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 42/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 43/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 44/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 45/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 46/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 47/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 48/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 49/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 50/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 51/80 :
+	Start transfer:[1.6002, -1.5131, 9.5827бу]
+
+Match Seq 52/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 53/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 54/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 55/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 56/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 57/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 58/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 59/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 60/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 61/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 62/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 63/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 64/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 65/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 66/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 67/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 68/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 69/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 70/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 71/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 72/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 73/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 74/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 75/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 76/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 77/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 78/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+Match Seq 79/80 :
+	Start transfer:[1.6002, -2.0131, 9.5827бу]
+
+
+====================MagPDR End =============================================
+Calculate and show the Evaluation results:
+	Mean Distance between PDR and GT:  1.4719504216535733
+	Mean Distance between MagPDR and GT:  0.7292430668981493
+	Target and Sigma percent between MagPDR and GT: 0.75 1.1538461538461537

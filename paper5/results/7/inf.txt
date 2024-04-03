@@ -1,0 +1,10 @@
+NNPDR 
+Mean=1.346m, Max=2.335m, Min=0.229m, CDF 50%=1.397m, CDF 90%=2.140m
+BFS\GNI 
+Mean=0.712m, Max=1.422m, Min=0.047m, CDF 50%=0.684m, CDF 90%=1.163m
+BFS\LM 
+Mean=0.602m, Max=1.844m, Min=0.012m, CDF 50%=0.589m, CDF 90%=1.130m
+BFS\LM\EKF 
+Mean=0.498m, Max=1.184m, Min=0.025m, CDF 50%=0.430m, CDF 90%=0.890m
+MEA\EKF 
+Mean=0.776m, Max=2.622m, Min=0.143m, CDF 50%=0.651m, CDF 90%=1.490m

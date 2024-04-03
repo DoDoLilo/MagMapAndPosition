@@ -1,0 +1,76 @@
+ 1-1 Error
+ORIGINAL_START_TRANSFER = [7, 1.5, math.radians(-89.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW =  ["../data/data_test/pdr/IMU-1-1-191.0820588816594 Pixel 3a.csv.npy",
+                 "../data/data_test/data_server_room/IMU-1-1-191.0820588816594 Pixel 3a_sync.csv"]
+
+1-2
+ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-103.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-1-2-191.47707604211791 Pixel 3a.csv.npy",
+                "../data/data_test/data_server_room/IMU-1-2-191.47707604211791 Pixel 3a_sync.csv"]
+
+
+2-2 Error
+ORIGINAL_START_TRANSFER = [6.7, 2.3, math.radians(-90.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-2-2-192.60949408574933 Pixel 6.csv.npy",
+                "../data/data_test/data_server_room/IMU-2-2-192.60949408574933 Pixel 6_sync.csv"]
+
+2-3 Error
+ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-103.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-2-3-184.99230319881104 Pixel 6.csv.npy",
+                "../data/data_test/data_server_room/IMU-2-3-184.99230319881104 Pixel 6_sync.csv"]
+
+
+10-1
+ORIGINAL_START_TRANSFER = [6.8, 1.7, math.radians(-103.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-1-190.80648806940607 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-1-190.80648806940607 Pixel 6_sync.csv"]
+
+10-2
+ORIGINAL_START_TRANSFER = [6.7, 1.7, math.radians(-98.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-2-183.5307793202117 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-2-183.5307793202117 Pixel 6_sync.csv"]
+
+10-3
+ORIGINAL_START_TRANSFER = [6.7, 1.9, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-3-170.97105500171142 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-3-170.97105500171142 Pixel 6_sync.csv"]
+
+
+10-4
+ORIGINAL_START_TRANSFER = [6.7, 1.6, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-4-180.40767532222338 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-4-180.40767532222338 Pixel 6_sync.csv"]
+
+
+10-5
+ORIGINAL_START_TRANSFER = [6.7, 1.75, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-5-170.2125898151382 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-5-170.2125898151382 Pixel 6_sync.csv"]
+
+
+10-6
+ORIGINAL_START_TRANSFER = [6.9, 2.2, math.radians(-100.)]
+START_CONFIG = [[0.25, 0.25, math.radians(1.2)], [3, 3, 3]]
+START_TRANSFERS = MMT.produce_transfer_candidates(ORIGINAL_START_TRANSFER, START_CONFIG)
+PATH_PDR_RAW = ["../data/data_test/pdr/IMU-10-6-178.00767980919863 Pixel 6.csv.npy",
+                "../data/data_test/data_to_building_map/IMU-10-6-178.00767980919863 Pixel 6_sync.csv"]
+
+

@@ -1,4 +1,3 @@
 # Project exclude paths
 .idea/
 /venv/
-/data/

@@ -1,0 +1,9 @@
+.npy文件是原始的pdr轨迹，用来作为测试主体
+marked_pdr_xy.csv文件是通过打点后较准的pdr轨迹，用来作为真值
+
+pdr_xy_change_inf.csv保存了对原始pdr轨迹做测试前需要做的预处理信息：
+     start_tranfer, pdr_xy_start_index, pdr_xy_end_index
+预处理：
+    1、将读出的原始pdr轨迹，先根据start_index, end_index切掉首尾部分坐标（注意end_index + 1）；
+      （切掉后的pdr就和真值pdr长度一致，不需要额外对齐）
+    2、将切后的pdr轨迹的起始点，平移到(0, 0)后，使用start_tranfer对其进行变换。

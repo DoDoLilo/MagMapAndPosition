@@ -1,0 +1,7 @@
+为什么更大的target loss更准？
+因为现在用app建库，建的库没有（以前）ilocator的准，
+所以loss的计算存在一定的误差，loss的计算结果肯定都会偏大，
+此时就要相应的提高target loss，否则条件太严苛，只会use last transfer.
+
+那如果匹配失败后不use last transfer而是选择最小的结果呢（设置search_pattern == SearchPattern.FULL_DEEP）？
+这样会导致每次匹配都是full search，没必要。

@@ -6,10 +6,10 @@
 import numpy as np
 
 files = [
-    # "../paper5/results/badLoss_and_Winerror(Inited_XingHu).csv",
-    # "../paper5/results/badLoss_and_Winerror(InReal_XingHu).csv",
-    "../paper5/results/badLoss_and_Winerror(Inited_InfCenter).csv",
-    "../paper5/results/badLoss_and_Winerror(InReal_InfCenter).csv"
+    "../paper5/results/badLoss_and_Winerror(Inited_XingHu).csv",
+    "../paper5/results/badLoss_and_Winerror(InReal_XingHu).csv",
+    # "../paper5/results/badLoss_and_Winerror(Inited_InfCenter).csv",  # 这个结果很垃圾
+    # "../paper5/results/badLoss_and_Winerror(InReal_InfCenter).csv" # 这个结果很垃圾
 ]
 
 if __name__ == '__main__':

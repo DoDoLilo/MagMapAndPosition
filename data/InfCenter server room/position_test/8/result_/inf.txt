@@ -1,0 +1,165 @@
+MOVE_X = 5.0
+MOVE_Y = 5.0
+MAP_SIZE_X = 35.0
+MAP_SIZE_Y = 20.0
+BLOCK_SIZE = 0.3
+EMD_FILTER_LEVEL = 3
+BUFFER_DIS = 5
+DOWN_SIP_DIS = 0.3
+SLIDE_STEP = 4
+SLIDE_BLOCK_SIZE = 0.3
+MAX_ITERATION = 90
+TARGET_MEAN_LOSS = 50
+STEP = 0.02
+UPPER_LIMIT_OF_GAUSSNEWTEON = 890
+PDR_IMU_ALIGN_SIZE = 10
+TRANSFERS_PRODUCE_CONFIG = [[0.5, 0.5, 0.017453292519943295], [2, 2, 20]]
+ORIGINAL_START_TRANSFER = [0.0, 0.0, 0.0]
+
+PATH_PDR_GT_IMU = ['./data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv.npy', './data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv']
+PATH_MAG_MAP = ['./data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mv_qiu_2d.csv', './data/InfCenter server room/mag_map/map_F1_2_3_4_B_0.3_deleted/mh_qiu_2d.csv']
+
+
+Match seq number: 45
+
+Match Seq 0/45 :
+	Start transfer:[0.0, 0.0, 0.0бу]
+
+Match Seq 1/45 :
+	Start transfer:[0.0, 0.0, 1.0бу]
+
+Match Seq 2/45 :
+	Start transfer:[0.0, 0.0, 1.0бу]
+
+Match Seq 3/45 :
+	Start transfer:[0.0, 0.0, 1.0бу]
+
+Match Seq 4/45 :
+	Start transfer:[0.0, 0.0, 1.0бу]
+
+Match Seq 5/45 :
+	Start transfer:[0.0, 0.0, 1.0бу]
+
+Match Seq 6/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 7/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 8/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 9/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 10/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 11/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 12/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 13/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 14/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 15/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 16/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 17/45 :
+	Start transfer:[-0.5, 0.0, 0.0бу]
+
+Match Seq 18/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 19/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 20/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 21/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 22/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 23/45 :
+	Start transfer:[-1.0, 0.0, 0.0бу]
+
+Match Seq 24/45 :
+	Start transfer:[-1.1781, 0.15478, -0.65833бу]
+
+Match Seq 25/45 :
+	Start transfer:[-0.72217, -0.51285, 1.2194бу]
+
+Match Seq 26/45 :
+	Start transfer:[-0.60339, -0.6849, 1.6988бу]
+
+Match Seq 27/45 :
+	Start transfer:[-0.51929, -0.87851, 2.1507бу]
+
+Match Seq 28/45 :
+	Start transfer:[-0.50495, -1.1042, 1.8509бу]
+
+Match Seq 29/45 :
+	Start transfer:[-1.5165, 0.18711, -1.1759бу]
+
+Match Seq 30/45 :
+	Start transfer:[-0.39663, -2.0392, 3.8802бу]
+
+Match Seq 31/45 :
+	Start transfer:[1.1444, -4.2741, 9.0571бу]
+
+Match Seq 32/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 33/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 34/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 35/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 36/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 37/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 38/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 39/45 :
+	Start transfer:[1.175, -4.3129, 9.1476бу]
+
+Match Seq 40/45 :
+	Start transfer:[0.67502, -4.3129, 9.1476бу]
+
+Match Seq 41/45 :
+	Start transfer:[0.67502, -4.3129, 9.1476бу]
+
+Match Seq 42/45 :
+	Start transfer:[0.67502, -4.3129, 9.1476бу]
+
+Match Seq 43/45 :
+	Start transfer:[0.67502, -4.3129, 9.1476бу]
+
+Match Seq 44/45 :
+	Start transfer:[0.67502, -4.3129, 9.1476бу]
+
+
+====================MagPDR End =============================================
+Calculate and show the Evaluation results:
+	Mean Distance between PDR and GT:  0.9034051296373786
+	Mean Distance between MagPDR and GT:  0.4628112660594215
+	Target and Sigma percent between MagPDR and GT: 0.9388888888888889 1.4444444444444444

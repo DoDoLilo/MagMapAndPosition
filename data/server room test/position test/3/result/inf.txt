@@ -1,0 +1,355 @@
+MOVE_X = 0.0
+MOVE_Y = 0.0
+MAP_SIZE_X = 20.0
+MAP_SIZE_Y = 15.0
+BLOCK_SIZE = 0.25
+EMD_FILTER_LEVEL = 3
+BUFFER_DIS = 5
+DOWN_SIP_DIS = 0.25
+SLIDE_STEP = 4
+SLIDE_BLOCK_SIZE = 0.25
+MAX_ITERATION = 90
+TARGET_MEAN_LOSS = 30
+STEP = 0.02
+UPPER_LIMIT_OF_GAUSSNEWTEON = 890
+PDR_IMU_ALIGN_SIZE = 10
+TRANSFERS_PRODUCE_CONFIG = [[0.25, 0.25, 0.026179938779914945], [5, 5, 5]]
+ORIGINAL_START_TRANSFER = [0.0, 0.0, 0.0]
+
+PATH_PDR_GT_IMU = ['./data/server room test/position test/3/TEST_2022-07-28-152352_sensors.csv.npy', './data/server room test/position test/3/marked_pdr_xy.csv', './data/server room test/position test/3/TEST_2022-07-28-152352_sensors.csv', './data/server room test/position test/3/pdr_xy_change_inf.csv']
+PATH_MAG_MAP = ['./data/server room test/mag_map/map_F5_6_B_0.25_deleted/mv_qiu_2d.csv', './data/server room test/mag_map/map_F5_6_B_0.25_deleted/mh_qiu_2d.csv']
+
+
+Match seq number: 29
+
+Match Seq 0 :
+	Start transfer:[0.0, 0.0, 0.0бу]
+	Found new transfer:[0.25, 0.0, 0.0бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 1.851, 1.128 = 2.168
+		.unsameness mv, mh, all: 3.112, 2.894 = 4.25
+		.grad level mv, mh, all: 17.4, 13.17 = 21.82
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.675, 0.3642 = 1.714
+		.unsameness mv, mh, all: 2.675, -1.132 = 2.905
+	Mean Distance between PDR and GT: 0.103
+	Mean Distance between MagPDR and GT: 0.149
+	Improvement: -0.046
+
+Match Seq 1 :
+	Start transfer:[0.25, 0.0, 0.0бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.552, 0.8752 = 1.781
+		.unsameness mv, mh, all: 29.1, -3.482 = 29.31
+	Mean Distance between PDR and GT: 0.283
+	Mean Distance between MagPDR and GT: 0.051
+	Improvement: 0.232
+
+Match Seq 2 :
+	Start transfer:[0.25, 0.0, 0.0бу]
+	Found new transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 1.354, 2.411 = 2.765
+		.unsameness mv, mh, all: 11.12, -3.573 = 11.68
+		.grad level mv, mh, all: 12.11, 16.3 = 20.31
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.189, 1.117 = 2.458
+		.unsameness mv, mh, all: 3.104, 2.993 = 4.312
+	Mean Distance between PDR and GT: 0.465
+	Mean Distance between MagPDR and GT: 0.212
+	Improvement: 0.253
+
+Match Seq 3 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.453, 1.357 = 2.803
+		.unsameness mv, mh, all: -4.515, -2.067 = 4.966
+	Mean Distance between PDR and GT: 0.648
+	Mean Distance between MagPDR and GT: 0.331
+	Improvement: 0.317
+
+Match Seq 4 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.6907, 5.362 = 5.406
+		.unsameness mv, mh, all: -4.248, 2.437 = 4.898
+	Mean Distance between PDR and GT: 0.760
+	Mean Distance between MagPDR and GT: 0.420
+	Improvement: 0.341
+
+Match Seq 5 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.291, 0.6939 = 1.466
+		.unsameness mv, mh, all: -1.736, -2.847 = 3.335
+	Mean Distance between PDR and GT: 0.793
+	Mean Distance between MagPDR and GT: 0.374
+	Improvement: 0.419
+
+Match Seq 6 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.907, 0.6708 = 1.128
+		.unsameness mv, mh, all: 2.496, -1.954 = 3.17
+	Mean Distance between PDR and GT: 0.825
+	Mean Distance between MagPDR and GT: 0.399
+	Improvement: 0.427
+
+Match Seq 7 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.333, 0.6571 = 2.424
+		.unsameness mv, mh, all: 2.875, -7.957 = 8.46
+	Mean Distance between PDR and GT: 0.881
+	Mean Distance between MagPDR and GT: 0.503
+	Improvement: 0.378
+
+Match Seq 8 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 3.98, 2.87 = 4.907
+		.unsameness mv, mh, all: 1.733, 2.558 = 3.09
+	Mean Distance between PDR and GT: 0.952
+	Mean Distance between MagPDR and GT: 0.671
+	Improvement: 0.281
+
+Match Seq 9 :
+	Start transfer:[-0.26323, 1.2188, -7.5296бу]
+	Found new transfer:[-0.21743, 1.1268, -7.0141бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 1.403, 1.303 = 1.914
+		.unsameness mv, mh, all: -1.836, -3.226 = 3.712
+		.grad level mv, mh, all: 36.03, 11.28 = 37.75
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.96, 0.8625 = 3.083
+		.unsameness mv, mh, all: 2.614, -15.4 = 15.62
+	Mean Distance between PDR and GT: 0.932
+	Mean Distance between MagPDR and GT: 0.571
+	Improvement: 0.361
+
+Match Seq 10 :
+	Start transfer:[-0.21743, 1.1268, -7.0141бу]
+	Found new transfer:[-0.074695, 0.85325, -5.5246бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 0.6267, 1.501 = 1.627
+		.unsameness mv, mh, all: -2.865, 2.437 = 3.761
+		.grad level mv, mh, all: 7.169, 6.616 = 9.755
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.714, 0.998 = 1.227
+		.unsameness mv, mh, all: 2.564, -6.786 = 7.254
+	Mean Distance between PDR and GT: 0.863
+	Mean Distance between MagPDR and GT: 0.444
+	Improvement: 0.419
+
+Match Seq 11 :
+	Start transfer:[-0.074695, 0.85325, -5.5246бу]
+	Found new transfer:[-0.11099, 1.1998, -6.2394бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 1.367, 1.482 = 2.016
+		.unsameness mv, mh, all: 7.094, 6.848 = 9.86
+		.grad level mv, mh, all: 30.76, 55.51 = 63.46
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.242, 1.44 = 2.665
+		.unsameness mv, mh, all: -18.74, 6.023 = 19.68
+	Mean Distance between PDR and GT: 0.860
+	Mean Distance between MagPDR and GT: 0.323
+	Improvement: 0.537
+
+Match Seq 12 :
+	Start transfer:[-0.11099, 1.1998, -6.2394бу]
+	Found new transfer:[-0.035755, 1.0225, -5.4504бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 2.842, 5.014 = 5.763
+		.unsameness mv, mh, all: 2.59, 3.067 = 4.014
+		.grad level mv, mh, all: 48.72, 86.74 = 99.49
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.699, 2.929 = 3.386
+		.unsameness mv, mh, all: 8.85, 3.232 = 9.421
+	Mean Distance between PDR and GT: 0.867
+	Mean Distance between MagPDR and GT: 0.479
+	Improvement: 0.389
+
+Match Seq 13 :
+	Start transfer:[-0.035755, 1.0225, -5.4504бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.103, 1.706 = 2.032
+		.unsameness mv, mh, all: 3.778, 2.444 = 4.5
+	Mean Distance between PDR and GT: 0.816
+	Mean Distance between MagPDR and GT: 0.452
+	Improvement: 0.364
+
+Match Seq 14 :
+	Start transfer:[-0.035755, 1.0225, -5.4504бу]
+	Found new transfer:[0.96425, 1.2725, -5.4504бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 1.404, 1.461 = 2.026
+		.unsameness mv, mh, all: 16.44, 2.73 = 16.67
+		.grad level mv, mh, all: 10.89, 24.62 = 26.92
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.6453, 2.67 = 2.747
+		.unsameness mv, mh, all: -3.614, -11.15 = 11.72
+	Mean Distance between PDR and GT: 0.866
+	Mean Distance between MagPDR and GT: 0.650
+	Improvement: 0.216
+
+Match Seq 15 :
+	Start transfer:[0.96425, 1.2725, -5.4504бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.513, 2.57 = 3.594
+		.unsameness mv, mh, all: 13.89, 207.0 = 207.5
+	Mean Distance between PDR and GT: 0.968
+	Mean Distance between MagPDR and GT: 0.472
+	Improvement: 0.495
+
+Match Seq 16 :
+	Start transfer:[0.96425, 1.2725, -5.4504бу]
+	Found new transfer:[1.0435, 1.6851, -4.3921бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 3.19, 5.394 = 6.267
+		.unsameness mv, mh, all: 2.766, -5.279 = 5.959
+		.grad level mv, mh, all: 41.47, 88.71 = 97.93
+	Features of real time mag: 
+		.deviation  mv, mh, all: 5.002, 5.532 = 7.458
+		.unsameness mv, mh, all: 2.481, 2.592 = 3.588
+	Mean Distance between PDR and GT: 1.167
+	Mean Distance between MagPDR and GT: 0.767
+	Improvement: 0.399
+
+Match Seq 17 :
+	Start transfer:[1.0435, 1.6851, -4.3921бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.9897, 3.039 = 3.196
+		.unsameness mv, mh, all: 3.179, 4.264 = 5.319
+	Mean Distance between PDR and GT: 1.384
+	Mean Distance between MagPDR and GT: 0.727
+	Improvement: 0.658
+
+Match Seq 18 :
+	Start transfer:[1.0435, 1.6851, -4.3921бу]
+	Found new transfer:[1.0808, 1.5864, -3.9167бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 0.5729, 1.699 = 1.793
+		.unsameness mv, mh, all: 9.912, -2.939 = 10.34
+		.grad level mv, mh, all: 14.05, 24.77 = 28.48
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.6108, 3.745 = 3.795
+		.unsameness mv, mh, all: 2.696, 32.02 = 32.13
+	Mean Distance between PDR and GT: 1.498
+	Mean Distance between MagPDR and GT: 0.548
+	Improvement: 0.950
+
+Match Seq 19 :
+	Start transfer:[1.0808, 1.5864, -3.9167бу]
+	Found new transfer:[1.0967, 1.5209, -3.4822бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 3.616, 1.908 = 4.089
+		.unsameness mv, mh, all: 2.58, 2.606 = 3.667
+		.grad level mv, mh, all: 36.91, 38.83 = 53.57
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.244, 3.656 = 4.289
+		.unsameness mv, mh, all: 3.124, 4.268 = 5.289
+	Mean Distance between PDR and GT: 1.603
+	Mean Distance between MagPDR and GT: 0.361
+	Improvement: 1.242
+
+Match Seq 20 :
+	Start transfer:[1.0967, 1.5209, -3.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.319, 2.459 = 2.791
+		.unsameness mv, mh, all: 5.977, -2.615 = 6.524
+	Mean Distance between PDR and GT: 1.886
+	Mean Distance between MagPDR and GT: 0.223
+	Improvement: 1.663
+
+Match Seq 21 :
+	Start transfer:[1.0967, 1.5209, -3.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.549, 4.528 = 4.786
+		.unsameness mv, mh, all: 2.579, 3.871 = 4.651
+	Mean Distance between PDR and GT: 1.962
+	Mean Distance between MagPDR and GT: 0.313
+	Improvement: 1.649
+
+Match Seq 22 :
+	Start transfer:[1.0967, 1.5209, -3.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.449, 3.006 = 3.337
+		.unsameness mv, mh, all: 59.98, 7.292 = 60.42
+	Mean Distance between PDR and GT: 1.892
+	Mean Distance between MagPDR and GT: 0.233
+	Improvement: 1.659
+
+Match Seq 23 :
+	Start transfer:[1.0967, 1.5209, -3.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 2.003, 5.186 = 5.56
+		.unsameness mv, mh, all: 5.825, 3.471 = 6.781
+	Mean Distance between PDR and GT: 1.791
+	Mean Distance between MagPDR and GT: 0.297
+	Improvement: 1.494
+
+Match Seq 24 :
+	Start transfer:[1.0967, 1.5209, -3.4822бу]
+	Found new transfer:[1.0967, 1.5209, -6.4822бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 2.692, 3.734 = 4.603
+		.unsameness mv, mh, all: -38.84, -11.74 = 40.58
+		.grad level mv, mh, all: 23.88, 39.03 = 45.76
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.503, 1.394 = 2.05
+		.unsameness mv, mh, all: 2.818, -2.042 = 3.48
+	Mean Distance between PDR and GT: 1.767
+	Mean Distance between MagPDR and GT: 0.313
+	Improvement: 1.454
+
+Match Seq 25 :
+	Start transfer:[1.0967, 1.5209, -6.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.394, 3.135 = 3.431
+		.unsameness mv, mh, all: 3.609, 2.853 = 4.601
+	Mean Distance between PDR and GT: 1.943
+	Mean Distance between MagPDR and GT: 0.364
+	Improvement: 1.580
+
+Match Seq 26 :
+	Start transfer:[1.0967, 1.5209, -6.4822бу]
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.2645, 2.295 = 2.31
+		.unsameness mv, mh, all: -7.096, 6.073 = 9.34
+	Mean Distance between PDR and GT: 1.888
+	Mean Distance between MagPDR and GT: 0.308
+	Improvement: 1.580
+
+Match Seq 27 :
+	Start transfer:[1.0967, 1.5209, -6.4822бу]
+	Found new transfer:[1.3467, 1.5209, -6.4822бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 0.721, 1.823 = 1.961
+		.unsameness mv, mh, all: 6.164, 6.949 = 9.289
+		.grad level mv, mh, all: 8.317, 23.36 = 24.79
+	Features of real time mag: 
+		.deviation  mv, mh, all: 0.7967, 4.558 = 4.627
+		.unsameness mv, mh, all: 5.007, 3.036 = 5.855
+	Mean Distance between PDR and GT: 1.792
+	Mean Distance between MagPDR and GT: 0.143
+	Improvement: 1.648
+
+Match Seq 28 :
+	Start transfer:[1.3467, 1.5209, -6.4822бу]
+	Found new transfer:[1.3467, 1.2709, -6.4822бу]
+	Features of map mag:
+		.deviation  mv, mh, all: 0.5046, 1.794 = 1.864
+		.unsameness mv, mh, all: -7.655, -2.205 = 7.966
+		.grad level mv, mh, all: 5.468, 20.73 = 21.44
+	Features of real time mag: 
+		.deviation  mv, mh, all: 1.307, 1.553 = 2.03
+		.unsameness mv, mh, all: 3.822, 10.24 = 10.93
+	Mean Distance between PDR and GT: 1.553
+	Mean Distance between MagPDR and GT: 0.316
+	Improvement: 1.238
+
+
+====================MagPDR End =============================================
+Calculate and show the Evaluation results:
+	Mean Distance between PDR and GT:  1.2321484812075407
+	Mean Distance between MagPDR and GT:  0.3944636097625117

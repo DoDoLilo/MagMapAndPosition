@@ -1,0 +1,45 @@
+607-1
+ORIGINAL_START_TRANSFER = [24.9, 12.3, math.radians(-97.)]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-1-17.064372160083312 Pixel 3a.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
+
+607-2
+ORIGINAL_START_TRANSFER = [24.8, 12.2, math.radians(-98.)]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-2-1.8863560954454208 Pixel 3a.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv"]
+
+607-3
+ORIGINAL_START_TRANSFER = [38.6, 11.9, math.radians(-95.)]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-3-194.87300511631324 Pixel 3a.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
+
+607-4
+ORIGINAL_START_TRANSFER = [38.9, 11.8, math.radians(-97.)]
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/pdr/IMU-607-4-187.68290595817584 Pixel 3a.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+
+
+607-1
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-1-17.064372160083312 Pixel 3a_sync.csv"]
+
+607-2
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-2-1.8863560954454208 Pixel 3a_sync.csv"]
+
+607-3
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-3-194.87300511631324 Pixel 3a_sync.csv"]
+
+607-4
+PATH_PDR_RAW = [
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/aligned_pdr/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv.npy",
+    "../data/data_test/data_to_position_pdr/one_floor_hall_hallway/gt/IMU-607-4-187.68290595817584 Pixel 3a_sync.csv"]
+
