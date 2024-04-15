@@ -17,41 +17,41 @@ MAP_SIZE_X = 70.0
 MAP_SIZE_Y = 28.0
 BLOCK_SIZE = 0.3  # 地图块大小，（m）
 EMD_FILTER_LEVEL = 3  # 低通滤波的程度，值越大滤波越强。整型，无单位。
-BUFFER_DIS = 12  # 缓冲池大小（m）
+BUFFER_DIS = 8  # 缓冲池大小（m）
 DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数倍？（下采样越小则相同长度序列的匹配点越多，匹配难度越大！）
 # --------迭代搜索参数----------------------
 SLIDE_STEP = 2  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 80  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 30  # 目标损失
+TARGET_MEAN_LOSS = 70  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-UPPER_LIMIT_OF_GAUSSNEWTEON = 4 * TARGET_MEAN_LOSS  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
+UPPER_LIMIT_OF_GAUSSNEWTEON = 2 * TARGET_MEAN_LOSS  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
-PDR_IMU_ALIGN_SIZE = 10  # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
-TRANSFERS_PRODUCE_CONFIG = [[0.4, 0.4, math.radians(1.2)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
-                            [2, 2, 2]]  # [1] = [枚举的正负个数]
+PDR_IMU_ALIGN_SIZE = 10 # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
+TRANSFERS_PRODUCE_CONFIG = [[0.1, 0.1, math.radians(1.)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
+                            [8, 8, 10]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 # PDR_IMU_START = 20  # PDR舍弃了所使用的IMU数据开头的一定数量的帧数
 # ---------数据文件路径---------------------------
 # PATH_PDR_RAW = [
-#     "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv.npy",
-#     "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv"]
+# "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv.npy",
+# "../data/InfCenter server room/position_test/5/IMU-812-5-277.2496012617084 Pixel 6_sync.csv"
+# ]
 
-# PATH_PDR_RAW = [
-#     "../data/InfCenter server room/position_test/6/IMU-812-6-269.09426660025395 Pixel 6_sync.csv.npy",
-#     "../data/InfCenter server room/position_test/6/IMU-812-6-269.09426660025395 Pixel 6_sync.csv"]
 
 # PATH_PDR_RAW = [
 #     "../data/InfCenter server room/position_test/7/IMU-812-7-195.4948665194862 Pixel 6_sync.csv.npy",
 #     "../data/InfCenter server room/position_test/7/IMU-812-7-195.4948665194862 Pixel 6_sync.csv"]
+#
+# PATH_PDR_RAW = [
+#     '../data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv.npy',
+#     '../data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv']
 
 # PATH_PDR_RAW = [
-#     "../data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv.npy",
-#     "../data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv"]
+#     '../data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv.npy',
+#     '../data/InfCenter server room/position_test/8/IMU-812-8-193.38120983931242 Pixel 6_sync.csv']
 
-# PATH_PDR_RAW = [
-#     "../data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv.npy",
-#     "../data/InfCenter server room/position_test/9/IMU-812-9-189.79622112889115 Pixel 6_sync.csv"]
+
 
 # 地磁指纹库文件，[0]为mv.csv，[1]为mh.csv
 # PATH_MAG_MAP = [
@@ -70,7 +70,7 @@ PATH_PDR_RAW_s = [
 ['../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv.npy',
                 '../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv']
 ]
-PATH_PDR_RAW = PATH_PDR_RAW_s[2]
+PATH_PDR_RAW = PATH_PDR_RAW_s[1]
 
 PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
                 '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
@@ -80,7 +80,7 @@ def main():
     result_dir_path = os.path.dirname(PATH_PDR_RAW[0]) + '/LM_result'
     if not os.path.exists(result_dir_path):
         os.mkdir(result_dir_path)
-    result_msg_file = open(result_dir_path + '/inf.txt', "w", encoding='GBK')
+    result_msg_file = open(result_dir_path + '/inf(LM).txt', "w", encoding='GBK')
     paint_map_size = [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0]
 
     print("MOVE_X = {0}\nMOVE_Y = {1}\nMAP_SIZE_X = {2}\nMAP_SIZE_Y = {3}\nBLOCK_SIZE = {4}\nEMD_FILTER_LEVEL = {5}\n"
@@ -275,7 +275,7 @@ def main():
     # 4.7 计算整段轨迹长度
     traj_length_dis = 0
     for i in range(1, len(pdr_xy)):
-        traj_length_dis += math.hypot(pdr_xy[i][0] - pdr_xy[i - 1][0], pdr_xy[i][1] - pdr_xy[i - 1][1])
+        traj_length_dis += math.hypot(gt_xy[i][0] - gt_xy[i - 1][0], gt_xy[i][1] - gt_xy[i - 1][1])
 
 
     # magPDR + PDR + GT
@@ -285,7 +285,7 @@ def main():
         final_all_xy.append([mp[0], mp[1],
                              pdr_xy[pi][0], pdr_xy[pi][1],
                              gt_xy[pi*PDR_IMU_ALIGN_SIZE][0], gt_xy[pi*PDR_IMU_ALIGN_SIZE][1]])
-    np.savetxt(result_dir_path + '/magPdr_Pdr_gt(bad_GNI).csv', final_all_xy, delimiter=',')
+    np.savetxt(result_dir_path + '/magPdr_Pdr_gt(LM1).csv', final_all_xy, delimiter=',')
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
@@ -320,12 +320,14 @@ def main():
     PT.paint_xy_list([gt_xy, pdr_xy, final_xy], ['GT', 'PDR', 'MagPDR'], paint_map_size, "Contrast of Lines",
                      save_file=result_dir_path + '/GT PDR MagPDR.png')
 
+    # 额外参数
+    print("Cost time:", end_time - start_time, " second", file=result_msg_file)
+    print("Traj length", traj_length_dis, " m", file=result_msg_file)
+    print("Cost time/Traj", (end_time - start_time) / traj_length_dis, " s/m", file=result_msg_file)
+
     result_msg_file.close()
 
-    # 额外参数
-    print("Cost time:", end_time - start_time, " second")
-    print("Traj length", traj_length_dis, " m")
-    print("Cost time/Traj", (end_time - start_time) / traj_length_dis, " s/m")
+
     return
 
 

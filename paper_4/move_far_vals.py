@@ -3,10 +3,13 @@ import statistics
 
 # 移除离群值：
 # 读取MFR与RMSD
-file = r'../paper_4/results/All_seq_features_RMSD_all_initByGT(deleted)/fc.csv'
+file = r'../paper_4/results/All_features_RMSD_all_initByGT(paper).csv'
 
-# 按照指定MFR间隔统计子区间离散数量
-result = np.loadtxt(file, delimiter=',')[0:228, :]
+# 按照指定MFR间隔统计子区间离散数量# seq_fc, seq_td, area_fc, area_td
+# result = np.loadtxt(file, delimiter=',')[:, 0:2]
+# result = np.loadtxt(file, delimiter=',')[:, 2:4]
+# result = np.loadtxt(file, delimiter=',')[:, 4:6]
+result = np.loadtxt(file, delimiter=',')[:, 6:8]
 mfr = result[0:228, 0]
 rmsd = result[0:228, 1]
 
@@ -42,4 +45,5 @@ for i in range(0, len(result)):
 
 new_result = np.array(new_result)
 print(len(new_result))
-np.savetxt('../paper_4/results/All_seq_features_RMSD_all_initByGT(deleted)/fc_filtered.csv', new_result, delimiter=',')
+# seq_fc, seq_td, area_fc, area_td
+np.savetxt('../paper_4/results/area_td_filtered.csv', new_result, delimiter=',')

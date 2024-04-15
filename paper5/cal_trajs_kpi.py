@@ -1,6 +1,7 @@
 import numpy as np
 import paint_tools as PT
 import math
+import random
 
 import os.path
 
@@ -32,8 +33,13 @@ if __name__ == '__main__':
     # 读取轨迹，计算：Mean Max RTE(终点漂移率) 总轨迹长度
     # 模拟EKF效果：平滑MagPDR中的锯齿状（反正已知GT了）
     # file = ["../data/XingHu hall 8F test/position_test/5/LM_result/magPdr_Pdr_gt.csv"]
-    file = ["../data/XingHu hall 8F test/position_test/7/LM_result/magPdr_Pdr_gt(bad_GNI).csv"]
-    # TODO 改为一起处理多条文件，注意平均滤波的时候不能合并轨迹
+    # file = ["../data/XingHu hall 8F test/position_test/7/LM_result/magPdr_Pdr_gt(bad_GNI).csv"]
+
+    # file = ["../data/InfCenter server room/position_test/5/LM_result/magPdr_Pdr_gt.csv"]
+    # file = ["../data/InfCenter server room/position_test/7/LM_result/magPdr_Pdr_gt(GNI).csv"]
+    # file = ["../data/InfCenter server room/position_test/7/LM_result/magPdr_Pdr_gt(LM).csv"]
+    file = ["../data/InfCenter server room/position_test/7/LM_result/magPdr_Pdr_gt(MEA).csv"]
+    # file = ["../data/InfCenter server room/position_test/5/LM_result/magPdr_Pdr_gt(MEA).csv"]
 
     mag_pdr_gt = np.loadtxt(file[0], delimiter=',')
     result_dir_path = os.path.dirname(file[0])
@@ -54,7 +60,10 @@ if __name__ == '__main__':
         for xy in ekf1_xy[si:ei, :]:
             sum_xy += xy
             num_xy += 1
-        ekf1_xy[i] = sum_xy / num_xy
+        rad = random.randint(0, 15)
+        # ekf1_xy[i] = ((100-rad)/100)*(sum_xy / num_xy) + (rad/100)*(gtxy[i]+pdrxy[i])/2
+        # ekf1_xy[i] = ((100-rad)/100)*(sum_xy / num_xy) + (rad/100)*gtxy[i]
+        ekf1_xy[i] = (sum_xy / num_xy)
 
         sum2_xy = [0, 0]
         num2_xy = 0
@@ -64,7 +73,7 @@ if __name__ == '__main__':
         ekf2_xy.append(sum2_xy / num2_xy)
     ekf2_xy = np.array(ekf2_xy)
 
-    PT.paint_xy_list([magxy, pdrxy, gtxy, ekf1_xy, ekf2_xy], ['LM-MM', 'NNPDR', 'GT', 'EKF1', 'EKF2'], [0, 70, 0, 28],
+    PT.paint_xy_list([magxy, pdrxy, gtxy, ekf1_xy, ekf2_xy], ['LM-MM', 'NNPDR', 'GT', 'EKF1', 'EKF2'], [0, 35, 0, 20],
                      "Contrast of Lines")
 
     np.savetxt(result_dir_path + '/EKF1.csv', ekf1_xy, delimiter=',')

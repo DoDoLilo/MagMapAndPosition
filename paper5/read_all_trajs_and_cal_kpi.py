@@ -14,11 +14,13 @@ def cal_traj_length(traj):
     return dis
 
 if __name__ == '__main__':
-    MAP_SIZE_X = 70.0
-    MAP_SIZE_Y = 28.0
+    # MAP_SIZE_X = 70.0
+    # MAP_SIZE_Y = 28.0
     all_traj_files = [
-        r"../paper5/results/5/GT_NNPDR_GNI_LM_EKF1_EKF2.csv",
-        r"../paper5/results/7/GT_NNPDR_GNI_LM_EKF1_EKF2.csv"
+        r"../paper5/results/InfCenter/5/GT_NNPDR_GNI_LM_EKF1_EKF2.csv",
+        r"../paper5/results/InfCenter/7/GT_NNPDR_GNI_LM_EKF1_EKF2.csv",
+        r"../paper5/results/Xinghu/5/GT_NNPDR_GNI_LM_EKF1_EKF2.csv",
+        r"../paper5/results/Xinghu/7/GT_NNPDR_GNI_LM_EKF1_EKF2.csv"
     ]
     name_list = ['GT', 'NNPDR', 'BFS\GNI', 'BFS\LM', 'BFS\LM\EKF', 'MEA\EKF']
 
@@ -35,7 +37,7 @@ if __name__ == '__main__':
         for j in range(0, all_trajs.shape[1], 2):
             traj_list.append(all_trajs[:, j:j + 2])
 
-        PT.paint_xy_list(traj_list, name_list, [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
+        # PT.paint_xy_list(traj_list, name_list, [0, MAP_SIZE_X * 1.0, 0, MAP_SIZE_Y * 1.0])
         #
         gt = traj_list[0]
         print("Traj Len", cal_traj_length(gt))
@@ -71,7 +73,7 @@ if __name__ == '__main__':
     print("\n\nAll Trajs")
     all_trajs = np.loadtxt(all_traj_files[0], delimiter=',')
     for i in range(1, len(all_traj_files)):
-        all_trajs = np.concatenate((all_trajs, np.loadtxt(all_traj_files[1], delimiter=',')), axis=0)
+        all_trajs = np.concatenate((all_trajs, np.loadtxt(all_traj_files[i], delimiter=',')), axis=0)
 
     # 按照列数获取轨迹
     traj_list = []
@@ -82,6 +84,7 @@ if __name__ == '__main__':
         error_list = []
         for gtxy, predxy in zip(gt, traj_list[i]):
             error_list.append(math.sqrt((gtxy[0] - predxy[0]) ** 2 + (gtxy[1] - predxy[1]) ** 2))
+            # print(error_list[-1])
         # 统计CDF
         error_list.sort()
         # 50% 90%
