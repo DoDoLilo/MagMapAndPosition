@@ -48,7 +48,7 @@ def transfer_axis(transfer, x0, y0):
 def mean_dis_bewteen_two_trajs(pdr_xy, gt_xy):
     dis_err = 0
     for pxy, gxy in zip(pdr_xy, gt_xy):
-        dis_err += math.sqrt((pxy[0] - gxy[0]) ** 2 + (gxy[1] - gxy[1]) ** 2)
+        dis_err += math.sqrt((pxy[0] - gxy[0]) ** 2 + (pxy[1] - gxy[1]) ** 2)
     return dis_err/len(dis_err)
 
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     MAX_ZOOM_K_DIS = 0.3
     #
     file = '../Paper3(MagMapBuild2)/results/InfCenter/mag_q_gt_pdr.csv'
-    save_file = 'results/InfCenter/new_mag_q_gt_pdr.csv'
+    save_file = 'results/InfCenter/new_mag_q_gt_pdr(CMM).csv'
 
     # file = '../Paper3(MagMapBuild2)/results/XingHu/mag_q_gt_pdr.csv'
     # save_file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr.csv'
@@ -98,7 +98,6 @@ if __name__ == '__main__':
 
     # marks = XingHu_marks
     marks = InfCenter_marks
-
     for i in range(0, len(gt_xy)):
         if i % 500 == 0:
             marks.append(gt_xy[i].copy())

@@ -41,7 +41,7 @@ def transfer_axis(transfer, x0, y0):
 def mean_dis_bewteen_two_trajs(pdr_xy, gt_xy):
     dis_err = 0
     for pxy, gxy in zip(pdr_xy, gt_xy):
-        dis_err += math.sqrt((pxy[0] - gxy[0]) ** 2 + (gxy[1] - gxy[1]) ** 2)
+        dis_err += math.sqrt((pxy[0] - gxy[0]) ** 2 + (pxy[1] - gxy[1]) ** 2)
     return dis_err/len(gt_xy)
 
 
@@ -62,10 +62,10 @@ if __name__ == '__main__':
     MAX_ZOOM_K_DIS = 0.1
     #
     # file = '../Paper3(MagMapBuild2)/results/InfCenter/mag_q_gt_pdr.csv'
-    # save_file = 'results/InfCenter/new_mag_q_gt_pdr.csv'
+    # save_file = 'results/InfCenter/new_mag_q_gt_pdr(CMM).csv'
 
     file = '../Paper3(MagMapBuild2)/results/XingHu/mag_q_gt_pdr.csv'
-    save_file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr.csv'
+    save_file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr(CMM).csv'
     print(file)
 
     mag_q_gt_pdr = np.loadtxt(file, delimiter=',')  # mag 0 1 2, quat 3 4 5 6, gt 7 8, pdr 9 10
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     new_marked_index = []
     for i in range(0, len(gt_xy)):
-        if i % 300 == 0:
+        if i % 150 == 0:
             new_marked_index.append([i, gt_xy[i][0], gt_xy[i][1]])
 
     new_marked_index = np.array(new_marked_index)  # [0:index, 1:mx, 2:my, 3:gx, 4:gy]

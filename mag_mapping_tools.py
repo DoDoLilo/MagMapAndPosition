@@ -243,6 +243,35 @@ def build_map_by_files_and_ilocator_xy(file_paths, move_x, move_y, map_size_x, m
     return rast_mv_mh
 
 
+def build_map_by_input_mag_q_xy(data_mag, data_quat, data_x_y,
+                                move_x, move_y, map_size_x, map_size_y,
+                                time_thr=-1,
+                                radius=1,
+                                block_size=0.3,
+                                delete_extra_blocks=False, delete_level=0,
+                                lowpass_filter_level=3,
+                                fig_save_dir=None
+                                ):
+    # 地磁转为垂直、水平分量mv\mh
+    arr_mv_mh = get_2d_mag_qiu(data_quat, data_mag)
+    # emd滤波，太慢了，不过是建库阶段，无所谓
+    mv_filtered_emd = lowpass_emd(arr_mv_mh[:, 0], lowpass_filter_level)
+    mh_filtered_emd = lowpass_emd(arr_mv_mh[:, 1], lowpass_filter_level)
+    arr_mv_mh = np.vstack((mv_filtered_emd, mh_filtered_emd)).transpose()
+    # 栅格化
+    change_axis(data_x_y, move_x, move_y)
+    rast_mv_mh = build_rast_mv_mh(arr_mv_mh, data_x_y, map_size_x, map_size_y, block_size)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/no_inter' if fig_save_dir is not None else None)
+    # 内插填补，绘制结果
+    rast_mv_mh_before_inter_fill = rast_mv_mh.copy()
+    inter_fill_completely(rast_mv_mh, time_thr, radius, block_size)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
+    if delete_extra_blocks:
+        delete_far_blocks(rast_mv_mh_before_inter_fill, rast_mv_mh, radius, block_size, delete_level)
+    PT.paint_heat_map(rast_mv_mh, save_dir=fig_save_dir + '/intered' if fig_save_dir is not None else None)
+    return rast_mv_mh
+
+
 # 1. 相比build_map_by_files_and_ilocator_xy，使用的是经过打点较准后的marked_pdr_xy，
 # 2. 且pdr坐标和imu数据分开输入，所以需要对齐后使用.
 # 3. 因为是已经被打点较准的pdr，所以不需要设置move_x,y再平移到植指纹地图坐标系.
@@ -1259,6 +1288,7 @@ def LM_produce_transfer_candidates_and_search(start_transfer, area_config,
         # print("\t\t.Found min or second, final loss = ", min_loss)
         # print("\t\tLoss list = ", loss_list)
         return transfer, min_xy
+
 
 def LM_cal_new_transfer_and_last_loss_xy(transfer, sparse_pdr_xy_mvh, mag_map, block_size, step):
     # 1、将sparse_PDR_mag里的PDR x,y 根据 last_transfer 转换坐标并计算坐标梯度，得到 map_xy, xy_grad
