@@ -29,12 +29,12 @@ DELETE_LEVEL = 0
 
 
 # file = '../Paper3(MagMapBuild2)/results/InfCenter/new_mag_q_gt_pdr.csv'
-# file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr.csv'
+file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr.csv'
 
 # file = '../Paper3(MagMapBuild2)/results/InfCenter/new_mag_q_gt_pdr(CMM).csv'
-file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr(CMM).csv'
+# file = '../Paper3(MagMapBuild2)/results/XingHu/new_mag_q_gt_pdr(CMM).csv'
 # 构建指纹文件存储dir
-save_dir_name = 'map_F'
+save_dir_name = 'crowdMap2'
 # save_dir_path = '../Paper3(MagMapBuild2)/results/InfCenter/' + save_dir_name
 save_dir_path = '../Paper3(MagMapBuild2)/results/XingHu/' + save_dir_name
 save_dir_path += '_full' if not DELETE_EXTRA_BLOCKS else '_deleted'
@@ -60,14 +60,14 @@ np.savetxt(save_dir_path + '/mh_qiu_2d.csv', mag_map[:, :, 1], delimiter=',')
 
 rows = len(mag_map)
 cols = len(mag_map[0])
-mag_map_s = np.empty((rows, cols), dtype=float)
+# mag_map_s = np.empty((rows, cols), dtype=float)
+#
+# for i in range(0, rows):
+#     for j in range(0, cols):
+#         if mag_map[i][j][0] >= 0 and mag_map[i][j][1] >= 0:
+#             mag_map_s[i][j] = math.sqrt((mag_map[i][j][0])**2+(mag_map[i][j][1])**2)
+#         else:
+#             mag_map_s[i][j] = -1
+# np.savetxt(save_dir_path + '/ms.csv', mag_map_s, delimiter=',')
 
-for i in range(0, rows):
-    for j in range(0, cols):
-        if mag_map[i][j][0] >= 0 and mag_map[i][j][1] >= 0:
-            mag_map_s[i][j] = math.sqrt((mag_map[i][j][0])**2+(mag_map[i][j][1])**2)
-        else:
-            mag_map_s[i][j] = -1
-np.savetxt(save_dir_path + '/ms(CMM).csv', mag_map_s, delimiter=',')
-
-print("Save files to:", save_dir_path)
+# print("Save files to:", save_dir_path)

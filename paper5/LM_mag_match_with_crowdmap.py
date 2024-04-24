@@ -11,6 +11,7 @@ import time
 # MOVE_Y = 5.0
 # MAP_SIZE_X = 35.  # 地图坐标系大小 0-MAP_SIZE_X ，0-MAP_SIZE_Y（m）
 # MAP_SIZE_Y = 20.
+# xingHu
 MOVE_X = 10.0
 MOVE_Y = 15.0
 MAP_SIZE_X = 70.0
@@ -23,12 +24,12 @@ DOWN_SIP_DIS = BLOCK_SIZE  # 下采样粒度（m），应为块大小的整数�
 SLIDE_STEP = 2  # 滑动窗口步长
 SLIDE_BLOCK_SIZE = DOWN_SIP_DIS  # 滑动窗口最小粒度（m），最小应为下采样粒度！
 MAX_ITERATION = 80  # 高斯牛顿最大迭代次数
-TARGET_MEAN_LOSS = 70  # 目标损失
+TARGET_MEAN_LOSS = 65  # 目标损失
 STEP = 1 / 50  # 迭代步长，牛顿高斯迭代是局部最优，步长要小
-UPPER_LIMIT_OF_GAUSSNEWTEON = 3 * TARGET_MEAN_LOSS  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
+UPPER_LIMIT_OF_GAUSSNEWTEON = 2 * TARGET_MEAN_LOSS  # 当前参数下高斯牛顿迭代MAX_ITERATION的能降低的loss上限
 # ---------其他参数----------------------------
 PDR_IMU_ALIGN_SIZE = 10 # 1个PDR坐标对应的imu\iLocator数据个数，iLocator与imu已对齐
-TRANSFERS_PRODUCE_CONFIG = [[0.1, 0.1, math.radians(1.)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
+TRANSFERS_PRODUCE_CONFIG = [[0.2, 0.2, math.radians(1.)],  # 枚举transfers的参数，[0 ] = [△x, △y(米), △angle(弧度)]
                             [8, 8, 10]]  # [1] = [枚举的正负个数]
 ORIGINAL_START_TRANSFER = [0., 0., math.radians(0.)]  # 初始Transfer[△x, △y(米), △angle(弧度)]：先绕原坐标原点逆时针旋转，然后再平移
 # PDR_IMU_START = 20  # PDR舍弃了所使用的IMU数据开头的一定数量的帧数
@@ -70,10 +71,10 @@ PATH_PDR_RAW_s = [
 ['../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv.npy',
                 '../data/XingHu hall 8F test/position_test/8/IMU-88-8-189.88230883318997 Pixel 6_sync.csv']
 ]
-PATH_PDR_RAW = PATH_PDR_RAW_s[1]
+PATH_PDR_RAW = PATH_PDR_RAW_s[3]
 
-PATH_MAG_MAP = ['../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mv_qiu_2d.csv',
-                '../data/XingHu hall 8F test/mag_map/map_F1_2_B_0.3_full/mh_qiu_2d.csv']
+PATH_MAG_MAP = ['../Paper3(MagMapBuild2)/results/XingHu/crowdMap2_deleted/mv_qiu_2d.csv',
+                '../Paper3(MagMapBuild2)/results/XingHu/crowdMap2_deleted/mh_qiu_2d.csv']
 
 
 def main():
@@ -285,7 +286,7 @@ def main():
         final_all_xy.append([mp[0], mp[1],
                              pdr_xy[pi][0], pdr_xy[pi][1],
                              gt_xy[pi*PDR_IMU_ALIGN_SIZE][0], gt_xy[pi*PDR_IMU_ALIGN_SIZE][1]])
-    np.savetxt(result_dir_path + '/magPdr_Pdr_gt(LM1).csv', final_all_xy, delimiter=',')
+    np.savetxt(result_dir_path + '/magPdr_Pdr_gt(LM_CrowdMap).csv', final_all_xy, delimiter=',')
 
     # -----------5 输出结果参数------------------------------------------------------------------------------------------
     # 5.1 打印PDR xy与Ground Truth(iLocator)之间的单点距离、平均距离
